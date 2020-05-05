@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/lukehollenback/goose/trader/candle"
 	"github.com/lukehollenback/goose/trader/monitor"
 )
 
@@ -25,7 +26,13 @@ func main() {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
 	}
 
+	chCandleStarted, err := candle.Instance().Start()
+	if err != nil {
+		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
+	}
+
 	<-chMonitorStarted
+	<-chCandleStarted
 
 	//
 	// Block until we are shut down by the operating system.
@@ -42,7 +49,13 @@ func main() {
 		log.Fatalf("Failed to stop the match monitor service. (Error: %s)", err)
 	}
 
+	chCandleStopped, err := candle.Instance().Stop()
+	if err != nil {
+		log.Fatalf("Failed to stop the match monitor service. (Error: %s)", err)
+	}
+
 	<-chMonitorStopped
+	<-chCandleStopped
 
 	//
 	// Wrap everything up.

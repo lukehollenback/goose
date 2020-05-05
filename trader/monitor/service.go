@@ -24,14 +24,12 @@ type Service struct {
 }
 
 //
-// Instance a singleton instance of the match monitor service.
+// Instance returns a singleton instance of the match monitor service.
 //
 func Instance() *Service {
 	once.Do(func() {
 		o = &Service{
-			state:     disconnected,
-			chKill:    make(chan bool, 1),
-			chStopped: make(chan bool, 1),
+			state: disconnected,
 		}
 	})
 
@@ -56,20 +54,27 @@ func (o *Service) Start() (<-chan bool, error) {
 	go o.monitor()
 
 	//
-	// Return our "started" channel in case the caller wants to block on it.
+	// Return our "started" channel in case the caller wants to block on it and log some debug info.
 	//
 	chStarted := make(chan bool, 1)
 	chStarted <- true
+
+	log.Printf("The match monitor service has started.")
 
 	return chStarted, nil
 }
 
 //
-// Stop tells the service to shutdown. It is up to the caller to not call this multiple times in
+// Stop tells the service to shut down. It is up to the caller to not call this multiple times in
 // a row without starting the service first. A channel that can be blocked on for a "true" value –
 // which indiciates that shut down is complete – is returned.
 //
 func (o *Service) Stop() (<-chan bool, error) {
+	//
+	// Log some debug info.
+	//
+	log.Printf("The match monitor service is stopping...")
+
 	//
 	// Tell the goroutines that were spun off by the service to shutdown.
 	//
@@ -142,8 +147,6 @@ func (o *Service) monitor() {
 
 		select {
 		case <-o.chKill:
-			log.Printf("Shutting down monitor...")
-
 			cont = false
 
 			break
