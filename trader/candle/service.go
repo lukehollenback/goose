@@ -55,7 +55,7 @@ func (o *Service) Start() (<-chan bool, error) {
 //
 // Stop tells the service to shut down. It is up to the caller to not call this multiple times in
 // a row without starting the service first. A channel that can be blocked on for a "true" value –
-// which indiciates that shut down is complete – is returned.
+// which indicates that shut down is complete – is returned.
 //
 func (o *Service) Stop() (<-chan bool, error) {
 	//
