@@ -1,7 +1,7 @@
 package candle
 
 import (
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
@@ -52,9 +52,9 @@ func CreateCandle(
 
 //
 // Append calculates a given transaction into the candle (if possible). It is expected that the
-// provided transaction occured within the window in time that the candle represents a snapshot of.
+// provided transaction occurred within the window in time that the candle represents a snapshot of.
 //
-func (o *Candle) Append(time time.Time, amt decimal.Decimal) {
+func (o *Candle) Append(time time.Time, amt decimal.Decimal) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
@@ -62,8 +62,8 @@ func (o *Candle) Append(time time.Time, amt decimal.Decimal) {
 	// Make sure the provided transaction is valid for this candle.
 	//
 	if time.After(o.start.Add(o.duration)) {
-		log.Fatalf(
-			"Cannot append transaction from %s to %s candle starting at %s.",
+		return fmt.Errorf(
+			"cannot append transaction from %s to %s candle starting at %s",
 			time, o.duration, o.start,
 		)
 	}
@@ -84,4 +84,6 @@ func (o *Candle) Append(time time.Time, amt decimal.Decimal) {
 	o.total = o.total.Add(amt)
 	o.cnt = o.cnt.Add(One)
 	o.avg = o.total.Div(o.cnt)
+
+	return nil
 }
