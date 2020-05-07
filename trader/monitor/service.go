@@ -99,6 +99,8 @@ func (o *Service) monitor() {
 	//
 	var wsDialer ws.Dialer
 
+	o.state = connecting
+
 	o.conn, _, err = wsDialer.Dial("wss://ws-feed.pro.coinbase.com", nil)
 	if err != nil {
 		log.Fatalf("Could not connect to the Coinbase Pro websocket feed. (Error: %s)", err.Error())
