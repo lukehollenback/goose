@@ -39,7 +39,7 @@ func main() {
 	//
 	<-osInterrupt
 
-	log.Print("An operating system interrupt has been recieved. Shutting down all services...")
+	log.Print("An operating system interrupt has been received. Shutting down all services...")
 
 	//
 	// Stop all running services.

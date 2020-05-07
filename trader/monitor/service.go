@@ -151,27 +151,26 @@ func (o *Service) monitor() {
 
 			break
 
+		case msg := <-chMsg:
+			o.handleMessage(msg)
+
+			break
+
 		case err := <-chErr:
 			log.Fatalf(
 				"Could not read the next JSON message from the Coinbase Pro websocket feed. (Error: %s)",
 				err.Error(),
 			)
-
-			cont = false
-
-			break
-
-		case msg := <-chMsg:
-			o.handleMessage(msg)
-
-			break
 		}
 	}
 
 	//
 	// Close our websocket connection.
 	//
-	o.conn.Close()
+	err = o.conn.Close()
+	if err != nil {
+		log.Fatalf("Failed to close websocket connection to Coinbase Pro. (Error: %s)", err)
+	}
 
 	o.state = disconnected
 
