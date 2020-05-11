@@ -5,6 +5,7 @@ import (
   "sync"
   "time"
 
+  "github.com/logrusorgru/aurora"
   "github.com/shopspring/decimal"
 )
 
@@ -118,4 +119,21 @@ func (o *Candle) Append(time time.Time, amt decimal.Decimal) error {
   o.avg = o.total.Div(o.cnt)
 
   return nil
+}
+
+func (o *Candle) String() string {
+  var arrow aurora.Value
+
+  if o.close.GreaterThan(o.open) {
+    arrow = aurora.Green("▲")
+  } else if o.close.LessThan(o.open) {
+    arrow = aurora.Red("▼")
+  } else {
+    arrow = aurora.Blue("=")
+  }
+
+  return fmt.Sprintf(
+    "%s %s %s (High: %s, Low: %s, Avg: %s, Count: %s, Start: %s)",
+    o.open, arrow, o.close, o.high, o.low, o.avg, o.cnt, o.start,
+  )
 }

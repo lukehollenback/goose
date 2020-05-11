@@ -1,6 +1,8 @@
 package monitor
 
 import (
+  "github.com/lukehollenback/goose/trader/candle"
+  "github.com/shopspring/decimal"
   "log"
   "sync"
 
@@ -201,13 +203,62 @@ func (o *Service) readNextMessage(chMsg chan<- *coinbasepro.Message, chErr chan<
 }
 
 func (o *Service) handleMessage(msg *coinbasepro.Message) {
-  if msg.Type == "subscriptions" {
-    o.state = subscribed
+  if o.state == connected {
+    if msg.Type == "subscriptions" {
+      //
+      // Move the trade monitor service into a "subscribed" state – indicating that it has
+      // successfully received acknowledgement from the Coinbase Pro websocket API that it has
+      // subscribed to the necessary message channnels.
+      //
+      o.state = subscribed
 
-    log.Printf("Successfully subscribed to relevant Coinbase Pro websocket channels.")
+      log.Printf("Successfully subscribed to relevant Coinbase Pro websocket channels.")
+    }
   } else if o.state == subscribed {
+    if msg.Type == "last_match" {
+      //
+      // Extract the trade time and price from the message.
+      //
+      time := msg.Time.Time()
+      amt, err := decimal.NewFromString(msg.Price)
+      if err != nil {
+        log.Fatalf("Failed to parse price from message. (Message: %+v) (Error: %s)", msg, err)
+      }
+
+      //
+      // Initialize the Candle Store Service with the last trade as stated by the message.
+      //
+      oneMinCandle := candle.CreateCandle(time, candle.OneMin, amt)
+      fiveMinCandle := candle.CreateCandle(time, candle.FiveMin, amt)
+      fifteenMinCandle := candle.CreateCandle(time, candle.FifteenMin, amt)
+
+      if err := candle.Instance().Init(oneMinCandle, fiveMinCandle, fifteenMinCandle); err != nil {
+        log.Fatalf("Failed to initialize the Candle Store Service. (Error: %s)", err)
+      }
+
+      //
+      // Move the Trade Monitor Service into a "ready" state – indicating that it is now fully ready
+      // to begin monitoring and processing trades received from the Coinbase Pro websocket API.
+      //
+      o.state = ready
+    }
+  } else if o.state == ready {
     if msg.Type == "match" {
-      log.Printf("%s", msg.Price)
+      //
+      // Extract the trade time and price from the message.
+      //
+      time := msg.Time.Time()
+      amt, err := decimal.NewFromString(msg.Price)
+      if err != nil {
+        log.Fatalf("Failed to parse price from message. (Message: %+v) (Error: %s)", msg, err)
+      }
+
+      //
+      // Provide the trade to the candle store service.
+      //
+      if err := candle.Instance().Append(time, amt); err != nil {
+        log.Fatalf("Failed to provide the trade to the Candle Store Service. (Error: %s)", err)
+      }
     }
   }
 }

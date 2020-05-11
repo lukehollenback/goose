@@ -45,33 +45,40 @@ func CreateStore(interval time.Duration, initialCandle *Candle) (*Store, error) 
 // Append calculates a new trade into the most recently-created candle in the candle store. If the
 // time of the trade does not fall within the timespan of said candle, an error will occur.
 //
-func (o *Store) Append(time time.Time, amt decimal.Decimal) error {
+func (o *Store) Append(time time.Time, amt decimal.Decimal) (createdNewCandle bool, err error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+
+	//
+	// Initialize named return values.
+	//
+	createdNewCandle = false
+	err = nil
 
 	//
 	// Figure out if we need to create a new candle. Also, validate that we are not trying to append
 	// to a historical, closed-out candle in the candle store.
 	//
 	if time.After(o.lastCandleEnd) {
-		err := o.appendNewCandle(o.lastCandleEnd, amt)
-		if err != nil {
-			return err
+		if err = o.appendNewCandle(o.lastCandleEnd, amt); err != nil {
+			return
 		}
+
+		createdNewCandle = true
 	} else if time.Before(o.lastCandleStart) {
-		return fmt.Errorf("cannot modify closed-out candles in candle store")
+		err = fmt.Errorf("cannot modify closed-out candles in candle store")
+		return
 	}
 
 	//
 	// Grab the last candle in the candle store – which we have, at this point, validated is the one
 	// we must append the trade to – and actually update it.
 	//
-	err := o.candles[len(o.candles)-1].Append(time, amt)
-	if err != nil {
-		return err
+	if err = o.candles[len(o.candles)-1].Append(time, amt); err != nil {
+		return
 	}
 
-	return nil
+	return
 }
 
 //
