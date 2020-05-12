@@ -2,7 +2,6 @@ package candle
 
 import (
   "errors"
-  "fmt"
   "github.com/shopspring/decimal"
   "log"
   "sync"
@@ -19,8 +18,6 @@ var (
 //
 type Service struct {
   mu              *sync.Mutex
-  chKill          chan bool
-  chStopped       chan bool
   oneMinStore     *Store
   fiveMinStore    *Store
   fifteenMinStore *Store
@@ -49,12 +46,6 @@ func (o *Service) Start() (<-chan bool, error) {
   defer o.mu.Unlock()
 
   //
-  // (Re)initialize our instance variables.
-  //
-  o.chKill = make(chan bool, 1)
-  o.chStopped = make(chan bool, 1)
-
-  //
   // Return our "started" channel in case the caller wants to block on it and log some debug info.
   //
   chStarted := make(chan bool, 1)
@@ -80,17 +71,13 @@ func (o *Service) Stop() (<-chan bool, error) {
   log.Printf("The candle store service is stopping...")
 
   //
-  // Tell the goroutines that were spun off by the service to shutdown.
-  //
-  o.chKill <- true
-
-  //
   // Return the "stopped" channel that the caller can block on if they need to know that the
   // service has completely shutdown.
   //
-  o.chStopped <- true
+  chStopped := make(chan bool, 1)
+  chStopped <- true
 
-  return o.chStopped, nil
+  return chStopped, nil
 }
 
 //
@@ -128,11 +115,12 @@ func (o *Service) Init(oneMinCandle *Candle, fiveMinCandle *Candle, fifteenMinCa
   return nil
 }
 
+//
+// Append adds the provided trade to all of the necessary candle stores.
+//
 func (o *Service) Append(time time.Time, amt decimal.Decimal) error {
   o.mu.Lock()
   defer o.mu.Unlock()
-
-  var err error
 
   //
   // Ensure that the necessary candle stores have been initialized.
@@ -151,10 +139,7 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) error {
   if err != nil {
     return err
   } else if createdNewCandle {
-    prevCandle, err := o.GetOneMinCandle(1)
-    if err != nil {
-      return err
-    }
+    prevCandle := o.oneMinStore.Previous()
 
     log.Printf("1 Min ↝ %s", prevCandle)
   }
@@ -166,7 +151,9 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) error {
   if err != nil {
     return err
   } else if createdNewCandle {
-    log.Printf("New five minute candle created.")
+    prevCandle := o.fiveMinStore.Previous()
+
+    log.Printf("5 Min ↝ %s", prevCandle)
   }
 
   //
@@ -176,31 +163,10 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) error {
   if err != nil {
     return err
   } else if createdNewCandle {
-    log.Printf("New fifteen minute candle created.")
+    prevCandle := o.fifteenMinStore.Previous()
+
+    log.Printf("15 Min ↝ %s", prevCandle)
   }
 
   return nil
-}
-
-func (o *Service) GetOneMinCandle(index int) (*Candle, error) {
-  //
-  // Get the length of the one-minute candle store.
-  //
-  lenn := len(o.oneMinStore.candles)
-
-  //
-  // Make sure that the provided index is valid.
-  //
-  if index >= lenn {
-    return nil, fmt.Errorf(
-      "index %d does not exist in the one-minute candle store of length %d",
-      index, lenn,
-    )
-  }
-
-  //
-  // Retrieve the desired candle and return it.
-  //
-  pos := lenn - 1 - index
-  return o.oneMinStore.candles[pos], nil
 }

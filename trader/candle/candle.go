@@ -133,7 +133,7 @@ func (o *Candle) String() string {
   }
 
   return fmt.Sprintf(
-    "%s %s %s (High: %s, Low: %s, Avg: %s, Count: %s, Start: %s)",
+    "%s %s %s (H: %s, L: %s, A: %s, C: %s, S: %s)",
     o.open, arrow, o.close, o.high, o.low, o.avg, o.cnt, o.start,
   )
 }

@@ -21,18 +21,18 @@ func main() {
 	//
 	// Start up all necessary services.
 	//
-	chMonitorStarted, err := monitor.Instance().Start()
-	if err != nil {
-		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
-	}
-
 	chCandleStarted, err := candle.Instance().Start()
 	if err != nil {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
 	}
 
-	<-chMonitorStarted
+	chMonitorStarted, err := monitor.Instance().Start()
+	if err != nil {
+		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
+	}
+
 	<-chCandleStarted
+	<-chMonitorStarted
 
 	//
 	// Block until we are shut down by the operating system.

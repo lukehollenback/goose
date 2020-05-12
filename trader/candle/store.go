@@ -42,43 +42,78 @@ func CreateStore(interval time.Duration, initialCandle *Candle) (*Store, error) 
 }
 
 //
+// Previous retrieves the last closed-out candle from the candle store. If one does not exist, it
+// simply returns nil.
+//
+func (o *Store) Previous() *Candle {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	pos := len(o.candles) - 2
+
+	if pos < 0 {
+		return nil
+	}
+
+	return o.candles[pos]
+}
+
+//
+// Current retrieves the current in-progress candle from the candle store. If one does not exist, it
+// simply returns nil.
+//
+func (o *Store) Current() *Candle {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	pos := len(o.candles) - 1
+
+	if pos < 0 {
+		return nil
+	}
+
+	return o.candles[pos]
+}
+
+//
 // Append calculates a new trade into the most recently-created candle in the candle store. If the
 // time of the trade does not fall within the timespan of said candle, an error will occur.
 //
-func (o *Store) Append(time time.Time, amt decimal.Decimal) (createdNewCandle bool, err error) {
+func (o *Store) Append(time time.Time, amt decimal.Decimal) (bool, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
 	//
-	// Initialize named return values.
+	// Validate that we are not trying to append to a historical, closed-out candle in the candle
+	// store.
 	//
-	createdNewCandle = false
-	err = nil
+	if time.Before(o.lastCandleStart) {
+		return false, fmt.Errorf("cannot modify closed-out candles in candle store")
+	}
 
 	//
-	// Figure out if we need to create a new candle. Also, validate that we are not trying to append
-	// to a historical, closed-out candle in the candle store.
+	// Figure out if we need to create a new candle and do so if necessary.
 	//
 	if time.After(o.lastCandleEnd) {
-		if err = o.appendNewCandle(o.lastCandleEnd, amt); err != nil {
-			return
+		if err := o.appendNewCandle(o.lastCandleEnd, amt); err != nil {
+			return false, err
 		}
 
-		createdNewCandle = true
-	} else if time.Before(o.lastCandleStart) {
-		err = fmt.Errorf("cannot modify closed-out candles in candle store")
-		return
+		return true, nil
 	}
 
 	//
-	// Grab the last candle in the candle store – which we have, at this point, validated is the one
-	// we must append the trade to – and actually update it.
+	// If we get this far, we simply need to append to the most recent candle in the store. Grab the
+	// last candle in the candle store – which we have, at this point, validated is the one we must
+	// append the trade to – and actually update it.
 	//
-	if err = o.candles[len(o.candles)-1].Append(time, amt); err != nil {
-		return
+	curCandle := o.candles[len(o.candles)-1]
+
+	if err := curCandle.Append(time, amt); err != nil {
+		return false, err
 	}
 
-	return
+	return false, nil
 }
 
 //
