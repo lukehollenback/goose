@@ -19,11 +19,15 @@ var (
 // Service represents a match monitor service instance.
 //
 type Service struct {
-  mu        *sync.Mutex
-  state     state
-  conn      *ws.Conn
-  chKill    chan bool
-  chStopped chan bool
+  mu                          *sync.Mutex
+  state                       state
+  conn                        *ws.Conn
+  chKill                      chan bool
+  chStopped                   chan bool
+  onOneMinCandleClose         []func(*candle.Candle)
+  onFiveMinCandleClose        []func(*candle.Candle)
+  onFifteenMinCandleClose     []func(*candle.Candle)
+  onFiveFifteenMinCandleClose []func(*candle.Candle, *candle.Candle)
 }
 
 //
@@ -32,12 +36,60 @@ type Service struct {
 func Instance() *Service {
   once.Do(func() {
     o = &Service{
-      mu:    &sync.Mutex{},
-      state: disconnected,
+      mu:                          &sync.Mutex{},
+      state:                       disconnected,
+      onOneMinCandleClose:         make([]func(*candle.Candle), 0),
+      onFiveMinCandleClose:        make([]func(*candle.Candle), 0),
+      onFifteenMinCandleClose:     make([]func(*candle.Candle), 0),
+      onFiveFifteenMinCandleClose: make([]func(*candle.Candle, *candle.Candle), 0),
     }
   })
 
   return o
+}
+
+//
+// RegisterOneMinCandleCloseHandler registers a signal handler to be executed whenever a one minute
+// candle closes out.
+//
+func (o *Service) RegisterOneMinCandleCloseHandler(handler func(*candle.Candle)) {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
+  o.onOneMinCandleClose = append(o.onOneMinCandleClose, handler)
+}
+
+//
+// RegisterFiveMinCandleCloseHandler registers a signal handler to be executed whenever a five
+// minute candle closes out.
+//
+func (o *Service) RegisterFiveMinCandleCloseHandler(handler func(*candle.Candle)) {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
+  o.onFiveMinCandleClose = append(o.onFiveMinCandleClose, handler)
+}
+
+//
+// RegisterFifteenMinCandleCloseHandler registers a signal handler to be executed whenever a
+// fifteen minute candle closes out.
+//
+func (o *Service) RegisterFifteenMinCandleCloseHandler(handler func(*candle.Candle)) {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
+  o.onFifteenMinCandleClose = append(o.onFifteenMinCandleClose, handler)
+}
+
+//
+// RegisterFiveFifteenMinCandleCloseHandler registers a signal handler to be executed whenever BOTH
+// a five and a fifteen minute candle close out together.
+//
+func (o *Service) RegisterFiveFifteenMinCandleCloseHandler(handler func(*candle.Candle, *candle.Candle)) {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
+  o.onFiveFifteenMinCandleClose = append(o.onFiveFifteenMinCandleClose, handler)
 }
 
 //
@@ -256,9 +308,60 @@ func (o *Service) handleMessage(msg *coinbasepro.Message) {
       //
       // Provide the trade to the candle store service.
       //
-      if err := candle.Instance().Append(time, amt); err != nil {
+      closedCandles, err := candle.Instance().Append(time, amt)
+      if err != nil {
         log.Fatalf("Failed to provide the trade to the Candle Store Service. (Error: %s)", err)
       }
+
+      //
+      // Process any candles that were closed out.
+      //
+      go o.processClosedCandles(closedCandles)
+    }
+  }
+}
+
+//
+// processClosedCandles fires off any necessary signal handlers given the closed out candles
+// provided.
+//
+func (o *Service) processClosedCandles(candles *candle.Candles) {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
+  // NOTE ~> We must lock because we will be iterating slices that are members of the instance.
+
+  //
+  // Make sure candles were actually closed out.
+  //
+  if candles.OneMin == nil && candles.FiveMin == nil && candles.FifteenMin == nil {
+    return
+  }
+
+  //
+  // Fire off necessary signal handlers.
+  //
+  if candles.OneMin != nil {
+    for _, handler := range o.onOneMinCandleClose {
+      go handler(candles.OneMin)
+    }
+  }
+
+  if candles.FiveMin != nil {
+    for _, handler := range o.onFiveMinCandleClose {
+      go handler(candles.FiveMin)
+    }
+  }
+
+  if candles.FifteenMin != nil {
+    for _, handler := range o.onFifteenMinCandleClose {
+      go handler(candles.FifteenMin)
+    }
+  }
+
+  if candles.FiveMin != nil && candles.FifteenMin != nil {
+    for _, handler := range o.onFiveFifteenMinCandleClose {
+      go handler(candles.FiveMin, candles.FifteenMin)
     }
   }
 }

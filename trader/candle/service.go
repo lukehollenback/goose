@@ -116,9 +116,10 @@ func (o *Service) Init(oneMinCandle *Candle, fiveMinCandle *Candle, fifteenMinCa
 }
 
 //
-// Append adds the provided trade to all of the necessary candle stores.
+// Append adds the provided trade to all of the necessary candle stores. Returns a structure holding
+// references to any candles that were closed out by the append.
 //
-func (o *Service) Append(time time.Time, amt decimal.Decimal) error {
+func (o *Service) Append(time time.Time, amt decimal.Decimal) (*Candles, error) {
   o.mu.Lock()
   defer o.mu.Unlock()
 
@@ -126,22 +127,27 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) error {
   // Ensure that the necessary candle stores have been initialized.
   //
   if o.oneMinStore == nil || o.fiveMinStore == nil || o.fifteenMinStore == nil {
-    return errors.New(
+    return nil, errors.New(
       "cannot append trade before the candle store service's candle stores have been " +
           "initialized",
     )
   }
 
   //
+  // Create a new structure to hold references to any candles that were closed out by this append.
+  //
+  closedCandles := &Candles{}
+
+  //
   // Append the trade to the fifteen-minute candle store.
   //
   createdNewCandle, err := o.oneMinStore.Append(time, amt)
   if err != nil {
-    return err
+    return nil, err
   } else if createdNewCandle {
-    prevCandle := o.oneMinStore.Previous()
+    closedCandles.OneMin = o.oneMinStore.Previous()
 
-    log.Printf("1 Min ↝ %s", prevCandle)
+    log.Printf("1 Min ↝ %s", closedCandles.OneMin)
   }
 
   //
@@ -149,11 +155,11 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) error {
   //
   createdNewCandle, err = o.fiveMinStore.Append(time, amt)
   if err != nil {
-    return err
+    return nil, err
   } else if createdNewCandle {
-    prevCandle := o.fiveMinStore.Previous()
+    closedCandles.FiveMin = o.fiveMinStore.Previous()
 
-    log.Printf("5 Min ↝ %s", prevCandle)
+    log.Printf("5 Min ↝ %s", closedCandles.FiveMin)
   }
 
   //
@@ -161,12 +167,12 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) error {
   //
   createdNewCandle, err = o.fifteenMinStore.Append(time, amt)
   if err != nil {
-    return err
+    return nil, err
   } else if createdNewCandle {
-    prevCandle := o.fifteenMinStore.Previous()
+    closedCandles.FifteenMin = o.fifteenMinStore.Previous()
 
-    log.Printf("15 Min ↝ %s", prevCandle)
+    log.Printf("15 Min ↝ %s", closedCandles.FifteenMin)
   }
 
-  return nil
+  return closedCandles, nil
 }
