@@ -121,6 +121,78 @@ func (o *Candle) Append(time time.Time, amt decimal.Decimal) error {
   return nil
 }
 
+//
+// End returns the ending instant of time of the candle.
+//
+func (o *Candle) End() time.Time {
+  return o.start.Add(o.duration)
+}
+
+//
+// OpenAmt returns the currency amount that the candle opened at.
+//
+func (o *Candle) OpenAmt() decimal.Decimal {
+  return o.open
+}
+
+//
+// CloseAmt returns the currency amount that the candle closed at.
+//
+func (o *Candle) CloseAmt() decimal.Decimal {
+  return o.close
+}
+
+// TODO ~> Document.
+func (o *Candle) HighAmt() decimal.Decimal {
+  return o.high
+}
+
+// TODO ~> Document.
+func (o *Candle) LowAmt() decimal.Decimal {
+  return o.low
+}
+
+// TODO ~> Document.
+func (o *Candle) BodyTop() decimal.Decimal {
+  if o.close.GreaterThan(o.open) {
+    return o.close
+  }
+
+  return o.open
+}
+
+// TODO ~> Document.
+func (o *Candle) BodyBottom() decimal.Decimal {
+  if o.close.LessThan(o.open) {
+    return o.close
+  }
+
+  return o.open
+}
+
+// TODO ~> Document.
+func (o *Candle) BodySize() decimal.Decimal {
+  return o.BodyTop().Sub(o.BodyBottom())
+}
+
+// TODO ~> Document.
+func (o *Candle) WickSize() decimal.Decimal {
+  // NOTE ~> We intentionally do not take the absolute value after subtracting here because doing so
+  //  could mask a critical issue in our code. If the returned value is ever negative, something is
+  //  wrong with how the candle's high/low/open/close are being tracked.
+
+  return o.high.Sub(o.BodyTop())
+}
+
+// TODO ~> Document.
+func (o *Candle) TailSize() decimal.Decimal {
+  // NOTE ~> We intentionally do not take the absolute value after subtracting here because doing so
+  //  could mask a critical issue in our code. If the returned value is ever negative, something is
+  //  wrong with how the candle's high/low/open/close are being tracked.
+
+  return o.BodyBottom().Sub(o.low)
+}
+
 func (o *Candle) String() string {
   var arrow aurora.Value
 
@@ -129,7 +201,7 @@ func (o *Candle) String() string {
   } else if o.close.LessThan(o.open) {
     arrow = aurora.Red("▼")
   } else {
-    arrow = aurora.Blue("=")
+    arrow = aurora.Blue("◼")
   }
 
   return fmt.Sprintf(

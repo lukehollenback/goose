@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/lukehollenback/goose/trader/algos/movingaverages"
 	"log"
 	"os"
 	"os/signal"
@@ -33,6 +34,11 @@ func main() {
 
 	<-chCandleStarted
 	<-chMonitorStarted
+
+	//
+	// Start the desired algorithm(s).
+	//
+	movingaverages.Init()
 
 	//
 	// Block until we are shut down by the operating system.
