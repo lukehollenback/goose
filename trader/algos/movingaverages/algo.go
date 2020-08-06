@@ -19,6 +19,7 @@ var (
   once sync.Once
 
   invalidAvg = decimal.NewFromInt(-1)
+  two = decimal.NewFromInt(2)
 )
 
 type Algo struct {
@@ -120,15 +121,15 @@ func (o *Algo) onOneMinCandleClose(newCandle *candle.Candle) {
         // TODO ~> Signal that position should be bought.
 
         log.Printf(
-          "%s Short SMA (%s) has crossed above long SMA (%s). This is a %s signal (at %s)!",
-          LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Green("buy")), newCandle.CloseAmt(),
+          "%s Short SMA (%s) has crossed ABOVE long SMA (%s). This is a %s signal (at %s)!",
+          LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Green("BUY")), newCandle.CloseAmt(),
         )
       } else {
         // TODO ~> Signal that position should be sold.
 
         log.Printf(
-          "%s Short SMA (%s) has crossed above long SMA (%s). This is a %s signal (at %s)!",
-          LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Red("sell")), newCandle.CloseAmt(),
+          "%s Short SMA (%s) has crossed BELOW long SMA (%s). This is a %s signal (at %s)!",
+          LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Red("SELL")), newCandle.CloseAmt(),
         )
       }
     }
