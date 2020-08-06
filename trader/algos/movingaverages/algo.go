@@ -3,6 +3,7 @@ package movingaverages
 import (
   "github.com/logrusorgru/aurora"
   "github.com/lukehollenback/goose/structs/evictingqueue"
+  "github.com/lukehollenback/goose/trader/broker"
   "github.com/lukehollenback/goose/trader/candle"
   "github.com/lukehollenback/goose/trader/monitor"
   "github.com/shopspring/decimal"
@@ -118,19 +119,19 @@ func (o *Algo) onOneMinCandleClose(newCandle *candle.Candle) {
       // TODO ~> Signal that current position should be held.
     } else {
       if shortAboveLong {
-        // TODO ~> Signal that position should be bought.
-
         log.Printf(
           "%s Short SMA (%s) has crossed ABOVE long SMA (%s). This is a %s signal (at %s)!",
           LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Green("BUY")), newCandle.CloseAmt(),
         )
-      } else {
-        // TODO ~> Signal that position should be sold.
 
+        broker.Instance().Signal(broker.UptrendDetected, newCandle.CloseAmt())
+      } else {
         log.Printf(
           "%s Short SMA (%s) has crossed BELOW long SMA (%s). This is a %s signal (at %s)!",
           LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Red("SELL")), newCandle.CloseAmt(),
         )
+
+        broker.Instance().Signal(broker.DowntrendDetected, newCandle.CloseAmt())
       }
     }
   }

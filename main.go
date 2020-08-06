@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/lukehollenback/goose/trader/algos/movingaverages"
+	"github.com/lukehollenback/goose/trader/broker"
 	"log"
 	"os"
 	"os/signal"
@@ -27,12 +28,18 @@ func main() {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
 	}
 
+	chBrokerStarted, err := broker.Instance().Start()
+	if err != nil {
+		log.Fatalf("Failed to start the broker service. (Error: %s)", err)
+	}
+
 	chMonitorStarted, err := monitor.Instance().Start()
 	if err != nil {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
 	}
 
 	<-chCandleStarted
+	<-chBrokerStarted
 	<-chMonitorStarted
 
 	//
@@ -55,12 +62,18 @@ func main() {
 		log.Fatalf("Failed to stop the match monitor service. (Error: %s)", err)
 	}
 
+	chBrokerStopped, err := broker.Instance().Stop()
+	if err != nil {
+		log.Fatalf("Failed to stop the broker service. (Error: %s)", err)
+	}
+
 	chCandleStopped, err := candle.Instance().Stop()
 	if err != nil {
 		log.Fatalf("Failed to stop the match monitor service. (Error: %s)", err)
 	}
 
 	<-chMonitorStopped
+	<-chBrokerStopped
 	<-chCandleStopped
 
 	//
