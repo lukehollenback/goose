@@ -17,14 +17,17 @@ var (
 // Service represents a service instance.
 //
 type Service struct {
-  mu          *sync.Mutex
-  chKill      chan bool
-  chStopped   chan bool
-  position    position
-  mockUSD     decimal.Decimal
-  mockUSDInit decimal.Decimal
-  mockUSDGain decimal.Decimal
-  mockBTC     decimal.Decimal
+  mu        *sync.Mutex
+  chKill    chan bool
+  chStopped chan bool
+  position  position
+
+  isMockTrading bool
+  mockTradeFee  decimal.Decimal
+  mockUSD       decimal.Decimal
+  mockUSDInit   decimal.Decimal
+  mockUSDGain   decimal.Decimal
+  mockBTC       decimal.Decimal
 }
 
 //
@@ -33,16 +36,37 @@ type Service struct {
 func Instance() *Service {
   once.Do(func() {
     o = &Service{
-      mu:          &sync.Mutex{},
-      position:    offline,
-      mockUSD:     decimal.NewFromInt(100),
-      mockUSDInit: decimal.NewFromInt(100),
-      mockUSDGain: decimal.Zero,
-      mockBTC:     decimal.Zero,
+      mu:            &sync.Mutex{},
+      position:      offline,
+      isMockTrading: false,
     }
   })
 
   return o
+}
+
+//
+// EnableMockTrading turns on the mock trade executor and funds it with the provided initial amount
+// of capital.
+//
+func (o *Service) EnableMockTrading(initUSDHolding decimal.Decimal, tradeFee decimal.Decimal) {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
+  o.mockUSD = initUSDHolding
+  o.mockUSDInit = initUSDHolding
+  o.mockUSDGain = decimal.Zero
+  o.isMockTrading = true
+}
+
+//
+// DisableMockTrading turns off the mock trade executor.
+//
+func (o *Service) DisableMockTrading() {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
+  o.isMockTrading = false
 }
 
 //
@@ -118,25 +142,80 @@ func (o *Service) Stop() (<-chan bool, error) {
 // it can decide if it wants to enter or exit a position.
 //
 func (o *Service) Signal(signal Signal, price decimal.Decimal) {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
   // TODO ~> Flesh this mechanism out quite a bit. For now, we just immediately pretend to execute
   //  a trade so that we can see how we are doing.
 
+  //
+  // Depending on the signal that came in, enter or exit a position.
+  //
+  gainMsg := ""
+  feeMsg := ""
+
   if signal == UptrendDetected && o.position == waiting {
-    o.mockBTC = o.mockUSD.Div(price)
+    //
+    // Calculate the transaction fee.
+    //
+    fee := o.mockUSD.Mul(o.mockTradeFee)
+
+    //
+    // Execute the mock transaction and enter the new position.
+    //
+    o.mockBTC = o.mockUSD.Div(price).Sub(fee)
     o.mockUSD = decimal.Zero
     o.position = holding
+
+    //
+    // Build out a message explaining how much was spent on transaction fees during this mock trade.
+    //
+    feeMsg = fmt.Sprintf("Fees were %s.", aurora.Bold(aurora.Green(fmt.Sprintf("%s USD", fee))))
   } else if signal == DowntrendDetected && o.position == holding {
-    o.mockUSD = o.mockBTC.Mul(price)
+    //
+    // Calculate the transaction fee.
+    //
+    fee := o.mockBTC.Mul(o.mockTradeFee)
+
+    //
+    // Execute the mock transaction and exit the current position.
+    //
+    o.mockUSD = o.mockBTC.Mul(price).Sub(fee)
     o.mockBTC = decimal.Zero
     o.position = waiting
     o.mockUSDGain = o.mockUSD.Sub(o.mockUSDInit)
+
+    //
+    // Build out a message explaining how much was spent on transaction fees during this mock trade.
+    //
+    feeMsg = fmt.Sprintf("Fees were %s.", aurora.Bold(aurora.Yellow(fmt.Sprintf("%s BTC", fee))))
+
+    //
+    // Since we are now holding USD again, build out a message that explains the current running
+    // USD gain/loss.
+    //
+    if o.mockUSDGain.GreaterThan(decimal.Zero) {
+      gainMsg = fmt.Sprintf(
+        "Total running gain/loss is %s.",
+        aurora.Bold(aurora.Green(fmt.Sprintf("%s USD", o.mockUSDGain))),
+      )
+    } else {
+      gainMsg = fmt.Sprintf(
+        "Total running gain/loss is %s.",
+        aurora.Bold(aurora.Red(fmt.Sprintf("%s USD", o.mockUSDGain))),
+      )
+    }
   }
 
+  //
+  // Log details about the current position now that the mock trade has been executed.
+  //
   log.Printf(
-    "Mock trade executed! Current holdings are %s and %s. Total running gain/loss is %s.",
+    "Mock trade executed! Current holdings are %s and %s. %s %s",
     aurora.Bold(aurora.Yellow(fmt.Sprintf("%s BTC", o.mockBTC))),
     aurora.Bold(aurora.Green(fmt.Sprintf("%s USD", o.mockUSD))),
-    aurora.Bold(fmt.Sprintf("%s USD", o.mockUSD)),
+    feeMsg,
+    gainMsg,
   )
 }
 

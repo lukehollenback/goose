@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/lukehollenback/goose/trader/algos/movingaverages"
 	"github.com/lukehollenback/goose/trader/broker"
+	"github.com/shopspring/decimal"
 	"log"
 	"os"
 	"os/signal"
@@ -28,6 +29,7 @@ func main() {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
 	}
 
+	broker.Instance().EnableMockTrading(decimal.NewFromInt(100), decimal.NewFromFloat(0.005))
 	chBrokerStarted, err := broker.Instance().Start()
 	if err != nil {
 		log.Fatalf("Failed to start the broker service. (Error: %s)", err)

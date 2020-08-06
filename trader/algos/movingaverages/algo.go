@@ -20,6 +20,7 @@ var (
   once sync.Once
 
   invalidAvg = decimal.NewFromInt(-1)
+  one = decimal.NewFromInt(1)
   two = decimal.NewFromInt(2)
 )
 
@@ -41,11 +42,11 @@ type Algo struct {
 func Init() *Algo {
   once.Do(func() {
     o = &Algo{
-      candles:     evictingqueue.New(5),
-      maShortLen:  decimal.NewFromInt(1),
+      candles:     evictingqueue.New(9),
+      maShortLen:  decimal.NewFromInt(3),
       maShort:     invalidAvg,
       maShortPrev: invalidAvg,
-      maLongLen:   decimal.NewFromInt(5),
+      maLongLen:   decimal.NewFromInt(9),
       maLong:      invalidAvg,
       maLongPrev:  invalidAvg,
     }
@@ -103,7 +104,7 @@ func (o *Algo) onOneMinCandleClose(newCandle *candle.Candle) {
           " not yet been calculated.",
       LogPrefix,
       o.candles.Len(),
-      o.maLongLen,
+      o.maLongLen.Add(one),
     )
   } else {
     //
