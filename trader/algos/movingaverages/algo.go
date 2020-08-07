@@ -1,6 +1,8 @@
 package movingaverages
 
 import (
+  "flag"
+  "fmt"
   "github.com/logrusorgru/aurora"
   "github.com/lukehollenback/goose/structs/evictingqueue"
   "github.com/lukehollenback/goose/trader/broker"
@@ -16,13 +18,31 @@ const (
 )
 
 var (
-  o    *Algo
-  once sync.Once
+  o             *Algo
+  once          sync.Once
+  cfgMALongLen  *int
+  cfgMAShortLen *int
 
   invalidAvg = decimal.NewFromInt(-1)
-  one = decimal.NewFromInt(1)
-  two = decimal.NewFromInt(2)
+  one        = decimal.NewFromInt(1)
 )
+
+func init() {
+  //
+  // Register and parse configuration flags.
+  //
+  cfgMALongLen = flag.Int(
+    "ma-long-length",
+    15,
+    fmt.Sprintf("The length (in minutes) of the long moving average for use by the %s algorithm.", LogPrefix),
+  )
+
+  cfgMAShortLen = flag.Int(
+    "ma-short-length",
+    5,
+    fmt.Sprintf("The length (in minutes) of the short moving average for use by the %s algorithm.", LogPrefix),
+  )
+}
 
 type Algo struct {
   candles     *evictingqueue.EvictingQueue // Holds references to the most recent one-minute candles that have been provided to the algorithm.
@@ -41,19 +61,28 @@ type Algo struct {
 //
 func Init() *Algo {
   once.Do(func() {
+    //
+    // Instantiate the algorithm.
+    //
     o = &Algo{
-      candles:     evictingqueue.New(9),
-      maShortLen:  decimal.NewFromInt(3),
+      candles:     evictingqueue.New(*cfgMALongLen),
+      maShortLen:  decimal.NewFromInt(int64(*cfgMAShortLen)),
       maShort:     invalidAvg,
       maShortPrev: invalidAvg,
-      maLongLen:   decimal.NewFromInt(9),
+      maLongLen:   decimal.NewFromInt(int64(*cfgMALongLen)),
       maLong:      invalidAvg,
       maLongPrev:  invalidAvg,
     }
 
     monitor.Instance().RegisterOneMinCandleCloseHandler(o.onOneMinCandleClose)
 
-    log.Printf("Initialized the %s algorithm.", LogPrefix)
+    //
+    // Log some debug info.
+    //
+    log.Printf(
+      "Initialized the %s algorithm (Long MA = %s minutes, Short MA = %s minutes).",
+      LogPrefix, o.maLongLen, o.maShortLen,
+    )
   })
 
   return o

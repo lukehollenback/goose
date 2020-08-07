@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"github.com/lukehollenback/goose/trader/algos/movingaverages"
 	"github.com/lukehollenback/goose/trader/broker"
 	"github.com/shopspring/decimal"
@@ -20,6 +21,14 @@ func main() {
 	osInterrupt := make(chan os.Signal, 1)
 
 	signal.Notify(osInterrupt, os.Interrupt)
+
+	//
+	// Register and parse global flags.
+	//
+	// NOTE ~> Individual services and algorithms might register their own flags in their package
+	//  initialization functions. This, however, is the only place where they are parsed.
+	//
+	flag.Parse()
 
 	//
 	// Start up all necessary services.
