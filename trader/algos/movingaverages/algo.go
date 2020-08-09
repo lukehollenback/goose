@@ -20,6 +20,7 @@ const (
 var (
   o             *Algo
   once          sync.Once
+  cfgPeriod     *int
   cfgMALongLen  *int
   cfgMAShortLen *int
 
@@ -31,16 +32,31 @@ func init() {
   //
   // Register and parse configuration flags.
   //
+  cfgPeriod = flag.Int(
+    "ma-period",
+    5,
+    fmt.Sprintf(
+      "The period length (in minutes) that the %s algorithm should watch. Valid values are 1, 5, and 15.",
+      LogPrefix,
+    ),
+  )
+
   cfgMALongLen = flag.Int(
     "ma-long-length",
     15,
-    fmt.Sprintf("The length (in minutes) of the long moving average for use by the %s algorithm.", LogPrefix),
+    fmt.Sprintf(
+      "The length (in periods) of the long moving average for use by the %s algorithm.",
+      LogPrefix,
+    ),
   )
 
   cfgMAShortLen = flag.Int(
     "ma-short-length",
     5,
-    fmt.Sprintf("The length (in minutes) of the short moving average for use by the %s algorithm.", LogPrefix),
+    fmt.Sprintf(
+      "The length (in periods) of the short moving average for use by the %s algorithm.",
+      LogPrefix,
+    ),
   )
 }
 
@@ -74,14 +90,22 @@ func Init() *Algo {
       maLongPrev:  invalidAvg,
     }
 
-    monitor.Instance().RegisterOneMinCandleCloseHandler(o.onOneMinCandleClose)
+    if *cfgPeriod == 1 {
+      monitor.Instance().RegisterOneMinCandleCloseHandler(o.candleCloseHandler)
+    } else if *cfgPeriod == 5 {
+      monitor.Instance().RegisterFiveMinCandleCloseHandler(o.candleCloseHandler)
+    } else if *cfgPeriod == 15 {
+      monitor.Instance().RegisterFifteenMinCandleCloseHandler(o.candleCloseHandler)
+    } else {
+      // TODO ~> Throw an error.
+    }
 
     //
     // Log some debug info.
     //
     log.Printf(
-      "Initialized the %s algorithm (Long MA = %s minutes, Short MA = %s minutes).",
-      LogPrefix, o.maLongLen, o.maShortLen,
+      "Initialized the %s algorithm (Period = %d minutes, Long MA = %s periods, Short MA = %s periods).",
+      LogPrefix, *cfgPeriod, o.maLongLen, o.maShortLen,
     )
   })
 
@@ -89,11 +113,11 @@ func Init() *Algo {
 }
 
 //
-// onOneMinCandleClose is this algorithm's "candle close handler". It adds the newly-closed candle
+// candleCloseHandler is this algorithm's "candle close handler". It adds the newly-closed candle
 // that is provided to it to the algorithm's data structure, updates calculated moving averages
 // based on historically-handled candles.
 //
-func (o *Algo) onOneMinCandleClose(newCandle *candle.Candle) {
+func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
   //
   // Add the new candle to the evicting queue of candles known by the algorithm's instance. If the
   // evicting queue is already full, the oldest entry will be evicted.

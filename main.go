@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/lukehollenback/goose/trader/algos/movingaverages"
 	"github.com/lukehollenback/goose/trader/broker"
 	"github.com/shopspring/decimal"
@@ -28,6 +29,12 @@ func main() {
 	// NOTE ~> Individual services and algorithms might register their own flags in their package
 	//  initialization functions. This, however, is the only place where they are parsed.
 	//
+	cfgAsset := flag.String(
+		"asset",
+		"BTC",
+		fmt.Sprintf("The asset that should be traded."),
+	)
+
 	flag.Parse()
 
 	//
@@ -38,12 +45,16 @@ func main() {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
 	}
 
+	// TODO ~> Make mock trading configurable via program arguments.
+
+	broker.Instance().SetAsset(*cfgAsset)
 	broker.Instance().EnableMockTrading(decimal.NewFromInt(100), decimal.NewFromFloat(0.005))
 	chBrokerStarted, err := broker.Instance().Start()
 	if err != nil {
 		log.Fatalf("Failed to start the broker service. (Error: %s)", err)
 	}
 
+	monitor.Instance().SetAsset(*cfgAsset)
 	chMonitorStarted, err := monitor.Instance().Start()
 	if err != nil {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)

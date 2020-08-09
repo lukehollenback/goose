@@ -1,6 +1,7 @@
 package monitor
 
 import (
+  "fmt"
   "github.com/lukehollenback/goose/trader/candle"
   "github.com/shopspring/decimal"
   "log"
@@ -24,6 +25,8 @@ type Service struct {
   conn                            *ws.Conn
   chKill                          chan bool
   chStopped                       chan bool
+  asset                           string
+  market                          string
   onOneMinCandleCloseHandlers     []func(*candle.Candle)
   onFiveMinCandleCloseHandlers    []func(*candle.Candle)
   onFifteenMinCandleCloseHandlers []func(*candle.Candle)
@@ -46,6 +49,14 @@ func Instance() *Service {
   })
 
   return o
+}
+
+//
+// SetAsset tells the Monitor Service which asset it should subscribe to and watch.
+//
+func (o *Service) SetAsset(asset string) {
+  o.asset = asset
+  o.market = fmt.Sprintf("%s-USD", asset)
 }
 
 //
@@ -100,6 +111,11 @@ func (o *Service) RegisterCandleCloseHandler(handler func()) {
 func (o *Service) Start() (<-chan bool, error) {
   o.mu.Lock()
   defer o.mu.Unlock()
+
+  //
+  // Validate that necessary configurations have been provided.
+  //
+  // TODO ~> This.
 
   //
   // (Re)initialize our instance variables.
@@ -179,13 +195,13 @@ func (o *Service) monitor() {
       coinbasepro.MessageChannel{
         Name: "heartbeat",
         ProductIds: []string{
-          "BTC-USD",
+          o.market,
         },
       },
       coinbasepro.MessageChannel{
         Name: "matches",
         ProductIds: []string{
-          "BTC-USD",
+          o.market,
         },
       },
     },
@@ -264,7 +280,7 @@ func (o *Service) handleMessage(msg *coinbasepro.Message) {
       //
       o.state = subscribed
 
-      log.Printf("Successfully subscribed to relevant Coinbase Pro websocket channels.")
+      log.Printf("Successfully subscribed to relevant Coinbase Pro websocket channels (Market = %s).", o.market)
     }
   } else if o.state == subscribed {
     if msg.Type == "last_match" {

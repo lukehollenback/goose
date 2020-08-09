@@ -20,6 +20,7 @@ type Service struct {
   mu        *sync.Mutex
   chKill    chan bool
   chStopped chan bool
+  asset     string
   position  position
 
   isMockTrading bool
@@ -60,6 +61,14 @@ func (o *Service) EnableMockTrading(initUSDHolding decimal.Decimal, tradeFee dec
 }
 
 //
+// SetAsset tells the Broker Service which asset it should be trading. This should normally be the
+// same asset that is being monitored by the Monitor Service.
+//
+func (o *Service) SetAsset(asset string) {
+  o.asset = asset
+}
+
+//
 // DisableMockTrading turns off the mock trade executor.
 //
 func (o *Service) DisableMockTrading() {
@@ -77,6 +86,11 @@ func (o *Service) DisableMockTrading() {
 func (o *Service) Start() (<-chan bool, error) {
   o.mu.Lock()
   defer o.mu.Unlock()
+
+  //
+  // Validate that necessary configurations have been provided.
+  //
+  // TODO ~> This.
 
   //
   // (Re)initialize our instance variables.
@@ -188,7 +202,7 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal) {
     //
     // Build out a message explaining how much was spent on transaction fees during this mock trade.
     //
-    feeMsg = fmt.Sprintf("Fees were %s.", aurora.Bold(aurora.Yellow(fmt.Sprintf("%s BTC", fee))))
+    feeMsg = fmt.Sprintf("Fees were %s.", aurora.Bold(aurora.Yellow(fmt.Sprintf("%s %s", fee, o.asset))))
 
     //
     // Since we are now holding USD again, build out a message that explains the current running
@@ -212,7 +226,7 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal) {
   //
   log.Printf(
     "Mock trade executed! Current holdings are %s and %s. %s %s",
-    aurora.Bold(aurora.Yellow(fmt.Sprintf("%s BTC", o.mockBTC))),
+    aurora.Bold(aurora.Yellow(fmt.Sprintf("%s %s", o.mockBTC, o.asset))),
     aurora.Bold(aurora.Green(fmt.Sprintf("%s USD", o.mockUSD))),
     feeMsg,
     gainMsg,
