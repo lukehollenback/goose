@@ -8,12 +8,11 @@
     <a href="./COPYRIGHT"><img src="https://img.shields.io/badge/license-Copyright © 2020 Luke Hollenback-black.svg" alt="Status: Work in Progress"/></a>
   </div>
   
-  <div>
-    Quantitative Finance Cryptocurrency Trader
-  </div>
 </div>
 
-<hr>
+Goose is a *quantitative finance cryptocurrency trader* written primarily in *Go*. It has market
+watch and information services, trading services, a pluggable system for implementing scalable
+trading algorithms, backtesting capabilities, a gain/loss simulator, and a beautiful web console.
 
 ## Disclaimer
 
