@@ -4,7 +4,11 @@
   </div>
 
   <div>
-    <img src="https://img.shields.io/badge/Status-Work&#32;in&#32;Progress-blue.svg" alt="Status: Work in Progress"/> |
+    <img src="https://img.shields.io/badge/status-Work in Progress-blue.svg" alt="Status: Work in Progress"/>
+    <a href="./COPYRIGHT"><img src="https://img.shields.io/badge/license-Copyright © 2020 Luke Hollenback-black.svg" alt="Status: Work in Progress"/></a>
+  </div>
+  
+  <div>
     Quantitative Finance Cryptocurrency Trader
   </div>
 </div>
