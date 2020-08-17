@@ -4,7 +4,7 @@
   </div>
 
   <div>
-    ![Status: Work in Progress](https://img.shields.io/badge/Status-Work&#32;in&#32;Progress-blue.svg) |
+    <img src="https://img.shields.io/badge/Status-Work&#32;in&#32;Progress-blue.svg" alt="Status: Work in Progress"/> |
     Quantitative Finance Cryptocurrency Trader
   </div>
 </div>
