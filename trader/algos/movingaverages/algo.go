@@ -88,7 +88,6 @@ type Algo struct {
   smaLongPrev  decimal.Decimal // Previously-calculated long-duration moving average.
 
   emaEnabled            bool            // Whether or not to use the exponential moving average instead of the simple moving average.
-  emaExpSmoothingFactor decimal.Decimal // Calculated smoothing factor for use when using exponential/weighted moving averages.
   emaShort              decimal.Decimal // Most-recently-calculated short-duration exponential moving average.
   emaShortPrev          decimal.Decimal // Previously-calculated short-duration exponential moving average.
   emaLong               decimal.Decimal // Most-recently-calculated long-duration exponential moving average.
@@ -129,13 +128,6 @@ func InitWithFlags(period int, longLen int, shortLen int, exp bool) *Algo {
     }
 
     //
-    // Calculate the exponential smoothing factor.
-    //
-    // NOTE ~> EMA Smoothing Factor = 2 ÷ (number of time periods + 1)
-    //
-    o.emaExpSmoothingFactor = two.Div(o.longLen.Add(one))
-
-    //
     // Register the correct candle close listener for the configured period length.
     //
     if period == 1 {
@@ -152,9 +144,8 @@ func InitWithFlags(period int, longLen int, shortLen int, exp bool) *Algo {
     // Log some debug info.
     //
     log.Printf(
-      "%s Initialized. (Period = %d minutes, Long MA = %s periods, Short MA = %s periods, Exponential = %t, "+
-          "Exponential Smoothing Factor = %s).",
-      LogPrefix, *cfgPeriod, o.longLen, o.shortLen, o.emaEnabled, o.emaExpSmoothingFactor,
+      "%s Initialized. (Period = %d minutes, Long MA = %s periods, Short MA = %s periods, Exponential = %t).",
+      LogPrefix, *cfgPeriod, o.longLen, o.shortLen, o.emaEnabled,
     )
   })
 
