@@ -55,12 +55,12 @@ func TestFiveMinuteSMAFiveOverFifteen(t *testing.T) {
 
   o.candleCloseHandler(data)
 
-  if !o.smaShort.Equal(decimal.NewFromInt(11800)) {
-    t.Errorf("Expected SMA Short to be 11,800 but was instead %s.", o.smaShort)
+  if !o.maShort.Equal(decimal.NewFromInt(11800)) {
+    t.Errorf("Expected SMA Short to be 11,800 but was instead %s.", o.maShort)
   }
 
-  if !o.smaLong.Equal(decimal.NewFromInt(10600)) {
-    t.Errorf("Expected SMA Long to be 10,600 but was instead %s.", o.smaLong)
+  if !o.maLong.Equal(decimal.NewFromInt(10600)) {
+    t.Errorf("Expected SMA Long to be 10,600 but was instead %s.", o.maLong)
   }
 
   if o.lastSignal != broker.UptrendDetected {
@@ -94,12 +94,12 @@ func TestFiveMinuteSMAFiveUnderFifteen(t *testing.T) {
 
   o.candleCloseHandler(data)
 
-  if !o.smaShort.Equal(decimal.NewFromInt(8200)) {
-    t.Errorf("Expected SMA Short to be 8,200 but was instead %s.", o.smaShort)
+  if !o.maShort.Equal(decimal.NewFromInt(8200)) {
+    t.Errorf("Expected SMA Short to be 8,200 but was instead %s.", o.maShort)
   }
 
-  if !o.smaLong.Equal(decimal.NewFromInt(9400)) {
-    t.Errorf("Expected SMA Long to be 9,400 but was instead %s.", o.smaLong)
+  if !o.maLong.Equal(decimal.NewFromInt(9400)) {
+    t.Errorf("Expected SMA Long to be 9,400 but was instead %s.", o.maLong)
   }
 
   if o.lastSignal != broker.DowntrendDetected {
@@ -118,5 +118,72 @@ func TestFiveMinuteEMAFiveOverFifteen(t *testing.T) {
   //  to initialize the algorithm.
   //
   DeInit()
-  Init()
+  InitWithFlags(5, 15, 5, true)
+
+  //
+  // Seed the algorithm and verify that it is in the expected constant state.
+  //
+  seedAlgo()
+
+  //
+  // Simulate a short-over-long crossover and validate that averages were calculated properly and
+  // signals were determined properly.
+  //
+  data := candle.CreateCandle(now, FiveMinutes, decimal.NewFromInt(19000))
+
+  o.candleCloseHandler(data)
+
+  if !(o.maShort.GreaterThan(decimal.NewFromInt(12999)) && o.maShort.LessThan(decimal.NewFromInt(13000))) {
+    t.Errorf("Expected EMA Short to be ~13,000 but was instead %s.", o.maShort)
+  }
+
+  if !o.maLong.Equal(decimal.NewFromInt(11125)) {
+    t.Errorf("Expected EMA Long to be 11,125 but was instead %s.", o.maLong)
+  }
+
+  if o.lastSignal != broker.UptrendDetected {
+    t.Errorf(
+      "Expected an \"Uptrend Detected\" (signal %d) signal to have been fired, but instead a %d signal was.",
+      broker.UptrendDetected, o.lastSignal,
+    )
+  }
+}
+
+func TestFiveMinuteEMAFiveUnderFifteen(t *testing.T) {
+  //
+  // Initialize the algorithm.
+  //
+  // NOTE ~> We must first forcefully reset the singleton lock in case a previous test already tried
+  //  to initialize the algorithm.
+  //
+  DeInit()
+  InitWithFlags(5, 15, 5, true)
+
+  //
+  // Seed the algorithm and verify that it is in the expected constant state.
+  //
+  seedAlgo()
+
+  //
+  // Simulate a short-over-long crossover and validate that averages were calculated properly and
+  // signals were determined properly.
+  //
+  data := candle.CreateCandle(now, FiveMinutes, decimal.NewFromInt(1000))
+
+  o.candleCloseHandler(data)
+
+  if !(o.maShort.GreaterThan(decimal.NewFromInt(7000)) && o.maShort.LessThan(decimal.NewFromInt(7001))) {
+    t.Errorf("Expected EMA Short to be ~7,000 but was instead %s.", o.maShort)
+  }
+
+  if !o.maLong.Equal(decimal.NewFromInt(8875)) {
+    t.Errorf("Expected EMA Long to be 8,875 but was instead %s.", o.maLong)
+  }
+
+  if o.lastSignal != broker.DowntrendDetected {
+    t.Errorf(
+      "Expected an \"Downtrend Detected\" (signal %d) signal to have been fired, but instead a %d signal was.",
+      broker.DowntrendDetected, o.lastSignal,
+    )
+  }
 }

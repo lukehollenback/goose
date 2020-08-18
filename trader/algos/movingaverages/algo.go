@@ -74,9 +74,13 @@ func init() {
 type Algo struct {
   candles *evictingqueue.EvictingQueue // Holds references to the most recent one-minute candles that have been provided to the algorithm.
 
-  shortLen decimal.Decimal // Length of the short-duration moving average.
-  longLen  decimal.Decimal // Length of the long-duration moving average.
-  lastSignal broker.Signal // The last signal that was fired by the algorithm.
+  shortLen    decimal.Decimal // Length of the short-duration moving average.
+  longLen     decimal.Decimal // Length of the long-duration moving average.
+  lastSignal  broker.Signal   // The last signal that was fired by the algorithm.
+  maShort     decimal.Decimal
+  maShortPrev decimal.Decimal
+  maLong      decimal.Decimal
+  maLongPrev  decimal.Decimal
 
   smaShort     decimal.Decimal // Most-recently-calculated short-duration moving average.
   smaShortPrev decimal.Decimal // Previously-calculated short-duration moving average.
@@ -93,27 +97,31 @@ type Algo struct {
 
 //
 // Init initializes the algorithm and registers its signal handlers with the Trade Monitor Service.
-// Trade algorithms can only be initialized once – subsequent calls will simply return their
-// singleton instance.
+// Allows for the specification of initialization flags via parameters. Trade algorithms can only be
+// initialized once – subsequent calls will simply return their singleton instance.
 //
-func Init() *Algo {
+func InitWithFlags(period int, longLen int, shortLen int, exp bool) *Algo {
   once.Do(func() {
     //
     // Instantiate the algorithm.
     //
     o = &Algo{
-      candles: evictingqueue.New(*cfgLongLen),
+      candles: evictingqueue.New(longLen + 1),
 
-      shortLen: decimal.NewFromInt(int64(*cfgShortLen)),
-      longLen:  decimal.NewFromInt(int64(*cfgLongLen)),
-      lastSignal: broker.None,
+      shortLen:    decimal.NewFromInt(int64(shortLen)),
+      longLen:     decimal.NewFromInt(int64(longLen)),
+      lastSignal:  broker.None,
+      maShort:     invalidAvg,
+      maShortPrev: invalidAvg,
+      maLong:      invalidAvg,
+      maLongPrev:  invalidAvg,
 
       smaShort:     invalidAvg,
       smaShortPrev: invalidAvg,
       smaLong:      invalidAvg,
       smaLongPrev:  invalidAvg,
 
-      emaEnabled:   *cfgExp,
+      emaEnabled:   exp,
       emaShort:     invalidAvg,
       emaShortPrev: invalidAvg,
       emaLong:      invalidAvg,
@@ -130,11 +138,11 @@ func Init() *Algo {
     //
     // Register the correct candle close listener for the configured period length.
     //
-    if *cfgPeriod == 1 {
+    if period == 1 {
       monitor.Instance().RegisterOneMinCandleCloseHandler(o.candleCloseHandler)
-    } else if *cfgPeriod == 5 {
+    } else if period == 5 {
       monitor.Instance().RegisterFiveMinCandleCloseHandler(o.candleCloseHandler)
-    } else if *cfgPeriod == 15 {
+    } else if period == 15 {
       monitor.Instance().RegisterFifteenMinCandleCloseHandler(o.candleCloseHandler)
     } else {
       // TODO ~> Throw an error.
@@ -151,6 +159,15 @@ func Init() *Algo {
   })
 
   return o
+}
+
+//
+// Init initializes the algorithm and registers its signal handlers with the Trade Monitor Service.
+// Trade algorithms can only be initialized once – subsequent calls will simply return their
+// singleton instance.
+//
+func Init() *Algo {
+  return InitWithFlags(*cfgPeriod, *cfgLongLen, *cfgShortLen, *cfgExp)
 }
 
 //
@@ -207,12 +224,12 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
     //
     if candlesCurLen > o.shortLen.IntPart() {
       if o.emaShort == invalidAvg {
-        o.emaShortPrev = o.smaShort
+        o.emaShortPrev = o.smaShortPrev
       } else {
         o.emaShortPrev = o.emaShort
       }
 
-      o.emaShort = o.calculateExponentialMovingAverage(newCandle.CloseAmt(), o.emaShortPrev)
+      o.emaShort = o.calculateExponentialMovingAverage(newCandle.CloseAmt(), o.emaShortPrev, o.shortLen)
     }
   }
 
@@ -235,12 +252,12 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
     //
     if candlesCurLen > o.longLen.IntPart() {
       if o.emaLong == invalidAvg {
-        o.emaLongPrev = o.smaLong
+        o.emaLongPrev = o.smaLongPrev
       } else {
         o.emaLongPrev = o.emaLong
       }
 
-      o.emaLong = o.calculateExponentialMovingAverage(newCandle.CloseAmt(), o.emaLongPrev)
+      o.emaLong = o.calculateExponentialMovingAverage(newCandle.CloseAmt(), o.emaLongPrev, o.longLen)
     }
   }
 
@@ -249,11 +266,10 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
   // yet have a calculation for both moving averages, we must skip this step as the algorithm is not
   // warmed up enough.
   //
-  maShort, maShortPrev, maLong, maLongPrev := o.getMovingAverages()
-  log.Printf("S %s, SP %s, L %s, LP %s", maShort, maShortPrev, maLong, maLongPrev)
+  o.maShort, o.maShortPrev, o.maLong, o.maLongPrev = o.getMovingAverages()
 
-  if maShort.Equal(invalidAvg) || maShortPrev.Equal(invalidAvg) ||
-      maLong.Equal(invalidAvg) || maLongPrev.Equal(invalidAvg) {
+  if o.maShort.Equal(invalidAvg) || o.maShortPrev.Equal(invalidAvg) ||
+      o.maLong.Equal(invalidAvg) || o.maLongPrev.Equal(invalidAvg) {
     log.Printf(
       "%s Not warmed up yet (%d/%s data points collected). One or all moving averages has"+
           " not yet been calculated.",
@@ -268,26 +284,26 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
     // a "sell" opportunity). Otherwise, if no cross-over has occurred, it can be assumed that
     // the current position should be "held".
     //
-    shortAboveLong := o.smaShort.GreaterThan(maLong)
-    shortAboveLongPrev := o.smaShortPrev.GreaterThan(maLongPrev)
+    shortAboveLong := o.maShort.GreaterThan(o.maLong)
+    shortAboveLongPrev := o.maShortPrev.GreaterThan(o.maLongPrev)
 
-    shortBelowLong := o.smaShort.LessThan(maLong)
-    shortBelowLongPrev := o.smaShortPrev.LessThan(maLongPrev)
+    shortBelowLong := o.maShort.LessThan(o.maLong)
+    shortBelowLongPrev := o.maShortPrev.LessThan(o.maLongPrev)
 
     if shortAboveLong == shortAboveLongPrev && shortBelowLong == shortBelowLongPrev {
       // TODO ~> Signal that current position should be held.
     } else {
       if shortAboveLong {
         log.Printf(
-          "%s Short SMA (%s) has crossed ABOVE long SMA (%s). This is a %s signal (at %s)!",
-          LogPrefix, o.smaShort, o.smaLong, aurora.Bold(aurora.Green("BUY")), newCandle.CloseAmt(),
+          "%s Short MA (%s) has crossed ABOVE long MA (%s). This is a %s signal (at %s)!",
+          LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Green("BUY")), newCandle.CloseAmt(),
         )
 
         o.emitSignal(broker.UptrendDetected, newCandle)
       } else if shortBelowLong {
         log.Printf(
-          "%s Short SMA (%s) has crossed BELOW long SMA (%s). This is a %s signal (at %s)!",
-          LogPrefix, o.smaShort, o.smaLong, aurora.Bold(aurora.Red("SELL")), newCandle.CloseAmt(),
+          "%s Short MA (%s) has crossed BELOW long MA (%s). This is a %s signal (at %s)!",
+          LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Red("SELL")), newCandle.CloseAmt(),
         )
 
         o.emitSignal(broker.DowntrendDetected, newCandle)
@@ -355,9 +371,20 @@ func (o *Algo) calculateSimpleMovingAverage(lookback decimal.Decimal) decimal.De
 func (o *Algo) calculateExponentialMovingAverage(
     curCloseAmt decimal.Decimal,
     prevEMA decimal.Decimal,
+    periods decimal.Decimal,
 ) decimal.Decimal {
   // NOTE ~> EMA = (closing price - previous day's EMA) × smoothing constant as a decimal
   //  + previous day's EMA
 
-  return curCloseAmt.Sub(prevEMA).Mul(o.emaExpSmoothingFactor).Add(prevEMA)
+  //
+  // Calculate the exponential smoothing factor.
+  //
+  // NOTE ~> EMA Smoothing Factor = 2 ÷ (number of time periods + 1)
+  //
+  factor := two.Div(periods.Add(one))
+
+  //
+  // Calculate and return the EMA.
+  //
+  return curCloseAmt.Sub(prevEMA).Mul(factor).Add(prevEMA)
 }
