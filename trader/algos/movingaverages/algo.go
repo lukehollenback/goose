@@ -77,14 +77,14 @@ type Algo struct {
   shortLen    decimal.Decimal // Length of the short-duration moving average.
   longLen     decimal.Decimal // Length of the long-duration moving average.
   lastSignal  broker.Signal   // The last signal that was fired by the algorithm.
-  maShort     decimal.Decimal
-  maShortPrev decimal.Decimal
-  maLong      decimal.Decimal
-  maLongPrev  decimal.Decimal
+  maShort     decimal.Decimal // Most-recently-calculated short-duration moving average (either SMA or EMA depending on configuration).
+  maShortPrev decimal.Decimal // Previously-calculated short-duration moving average (either SMA or EMA depending on configuration).
+  maLong      decimal.Decimal // Most-recently-calculated long-duration moving average (either SMA or EMA depending on configuration).
+  maLongPrev  decimal.Decimal // Previously-calculated long-duration moving average (either SMA or EMA depending on configuration).
 
   smaShort     decimal.Decimal // Most-recently-calculated short-duration moving average.
   smaShortPrev decimal.Decimal // Previously-calculated short-duration moving average.
-  smaLong      decimal.Decimal // Most-recently-calculated long-duration  moving average.
+  smaLong      decimal.Decimal // Most-recently-calculated long-duration moving average.
   smaLongPrev  decimal.Decimal // Previously-calculated long-duration moving average.
 
   emaEnabled            bool            // Whether or not to use the exponential moving average instead of the simple moving average.
