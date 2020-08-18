@@ -35,31 +35,60 @@ func main() {
 		fmt.Sprintf("The asset that should be traded."),
 	)
 
+	cfgMock := flag.Bool(
+		"mock",
+		false,
+		fmt.Sprintf("Whether or not mock trading should be enabled."),
+	)
+
+	cfgMockAmt := flag.Int64(
+		"mock-amount",
+		1000,
+		fmt.Sprintf("The initial amount of USD to fund the mock trader with."),
+	)
+
+	cfgMockFee := flag.Float64(
+		"mock-fee",
+		0.00075,
+		fmt.Sprintf("The maker/taker fee that each mock trade costs to execute."),
+	)
+
 	flag.Parse()
 
 	//
-	// Start up all necessary services.
+	// Start up the Candle Service
 	//
 	chCandleStarted, err := candle.Instance().Start()
 	if err != nil {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
 	}
 
-	// TODO ~> Make mock trading configurable via program arguments.
-
+	//
+	// Start up the Broker Service.
+	//
 	broker.Instance().SetAsset(*cfgAsset)
-	broker.Instance().EnableMockTrading(decimal.NewFromInt(100), decimal.NewFromFloat(0.005))
+
+	if *cfgMock {
+		broker.Instance().EnableMockTrading(decimal.NewFromInt(*cfgMockAmt), decimal.NewFromFloat(*cfgMockFee))
+	}
+
 	chBrokerStarted, err := broker.Instance().Start()
 	if err != nil {
 		log.Fatalf("Failed to start the broker service. (Error: %s)", err)
 	}
 
+	//
+	// Start up the Monitor Service.
+	//
 	monitor.Instance().SetAsset(*cfgAsset)
 	chMonitorStarted, err := monitor.Instance().Start()
 	if err != nil {
 		log.Fatalf("Failed to start the match monitor service. (Error: %s)", err)
 	}
 
+	//
+	// Wait for all services to finish starting up.
+	//
 	<-chCandleStarted
 	<-chBrokerStarted
 	<-chMonitorStarted
