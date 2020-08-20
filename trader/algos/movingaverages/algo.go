@@ -4,6 +4,7 @@ import (
   "flag"
   "fmt"
   "github.com/logrusorgru/aurora"
+  "github.com/lukehollenback/goose/constants"
   "github.com/lukehollenback/goose/structs/evictingqueue"
   "github.com/lukehollenback/goose/trader/broker"
   "github.com/lukehollenback/goose/trader/candle"
@@ -24,10 +25,6 @@ var (
   cfgLongLen  *int
   cfgShortLen *int
   cfgExp      *bool
-
-  invalidAvg = decimal.NewFromInt(-1)
-  one        = decimal.NewFromInt(1)
-  two        = decimal.NewFromInt(2)
 )
 
 func init() {
@@ -110,21 +107,21 @@ func InitWithFlags(period int, longLen int, shortLen int, exp bool) *Algo {
       shortLen:    decimal.NewFromInt(int64(shortLen)),
       longLen:     decimal.NewFromInt(int64(longLen)),
       lastSignal:  broker.None,
-      maShort:     invalidAvg,
-      maShortPrev: invalidAvg,
-      maLong:      invalidAvg,
-      maLongPrev:  invalidAvg,
+      maShort:     constants.NegOne(),
+      maShortPrev: constants.NegOne(),
+      maLong:      constants.NegOne(),
+      maLongPrev:  constants.NegOne(),
 
-      smaShort:     invalidAvg,
-      smaShortPrev: invalidAvg,
-      smaLong:      invalidAvg,
-      smaLongPrev:  invalidAvg,
+      smaShort:     constants.NegOne(),
+      smaShortPrev: constants.NegOne(),
+      smaLong:      constants.NegOne(),
+      smaLongPrev:  constants.NegOne(),
 
       emaEnabled:   exp,
-      emaShort:     invalidAvg,
-      emaShortPrev: invalidAvg,
-      emaLong:      invalidAvg,
-      emaLongPrev:  invalidAvg,
+      emaShort:     constants.NegOne(),
+      emaShortPrev: constants.NegOne(),
+      emaLong:      constants.NegOne(),
+      emaLongPrev:  constants.NegOne(),
     }
 
     //
@@ -214,7 +211,7 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
     //  recently-calculated SMA.
     //
     if candlesCurLen > o.shortLen.IntPart() {
-      if o.emaShort == invalidAvg {
+      if o.emaShort == constants.NegOne() {
         o.emaShortPrev = o.smaShortPrev
       } else {
         o.emaShortPrev = o.emaShort
@@ -242,7 +239,7 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
     //  recently-calculated SMA.
     //
     if candlesCurLen > o.longLen.IntPart() {
-      if o.emaLong == invalidAvg {
+      if o.emaLong == constants.NegOne() {
         o.emaLongPrev = o.smaLongPrev
       } else {
         o.emaLongPrev = o.emaLong
@@ -259,14 +256,14 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
   //
   o.maShort, o.maShortPrev, o.maLong, o.maLongPrev = o.getMovingAverages()
 
-  if o.maShort.Equal(invalidAvg) || o.maShortPrev.Equal(invalidAvg) ||
-      o.maLong.Equal(invalidAvg) || o.maLongPrev.Equal(invalidAvg) {
+  if o.maShort.Equal(constants.NegOne()) || o.maShortPrev.Equal(constants.NegOne()) ||
+      o.maLong.Equal(constants.NegOne()) || o.maLongPrev.Equal(constants.NegOne()) {
     log.Printf(
       "%s Not warmed up yet (%d/%s data points collected). One or all moving averages has"+
           " not yet been calculated.",
       LogPrefix,
       o.candles.Len(),
-      o.longLen.Add(one),
+      o.longLen.Add(constants.One()),
     )
   } else {
     //
@@ -372,7 +369,7 @@ func (o *Algo) calculateExponentialMovingAverage(
   //
   // NOTE ~> EMA Smoothing Factor = 2 ÷ (number of time periods + 1)
   //
-  factor := two.Div(periods.Add(one))
+  factor := constants.Two().Div(periods.Add(constants.One()))
 
   //
   // Calculate and return the EMA.
