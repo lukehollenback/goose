@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/lukehollenback/goose/trader/algos/movingaverages"
 	"github.com/lukehollenback/goose/trader/broker"
+	"github.com/lukehollenback/goose/trader/writer"
 	"github.com/shopspring/decimal"
 	"log"
 	"os"
@@ -56,6 +57,14 @@ func main() {
 	flag.Parse()
 
 	//
+	// Start up the Writer Service.
+	//
+	chWriterStarted, err := writer.Instance().Start()
+	if err != nil {
+		log.Fatalf("Failed to start the writer service. (Error: %s)", err)
+	}
+
+	//
 	// Start up the Candle Service
 	//
 	chCandleStarted, err := candle.Instance().Start()
@@ -89,6 +98,7 @@ func main() {
 	//
 	// Wait for all services to finish starting up.
 	//
+	<-chWriterStarted
 	<-chCandleStarted
 	<-chBrokerStarted
 	<-chMonitorStarted
@@ -123,9 +133,15 @@ func main() {
 		log.Fatalf("Failed to stop the match monitor service. (Error: %s)", err)
 	}
 
+	chWriterStopped, err := writer.Instance().Stop()
+	if err != nil {
+		log.Fatalf("Failed to stop the writer service. (Error: %s)", err)
+	}
+
 	<-chMonitorStopped
 	<-chBrokerStopped
 	<-chCandleStopped
+	<-chWriterStopped
 
 	//
 	// Wrap everything up.
