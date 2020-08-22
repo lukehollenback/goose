@@ -3,9 +3,11 @@ package broker
 import (
   "fmt"
   "github.com/logrusorgru/aurora"
+  "github.com/lukehollenback/goose/trader/writer"
   "github.com/shopspring/decimal"
   "log"
   "sync"
+  "time"
 )
 
 var (
@@ -155,7 +157,7 @@ func (o *Service) Stop() (<-chan bool, error) {
 // Signal tells the Broker Service that a trend or scenario has been detected by an algorithm so
 // it can decide if it wants to enter or exit a position.
 //
-func (o *Service) Signal(signal Signal, price decimal.Decimal) {
+func (o *Service) Signal(signal Signal, price decimal.Decimal, timestamp time.Time) {
   o.mu.Lock()
   defer o.mu.Unlock()
 
@@ -184,7 +186,7 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal) {
     //
     // Build out a message explaining how much was spent on transaction fees during this mock trade.
     //
-    feeMsg = fmt.Sprintf("Fees were %s.", aurora.Bold(aurora.Green(fmt.Sprintf("%s USD", fee))))
+    feeMsg = fmt.Sprintf("Fees were %s.", aurora.Bold(aurora.Blue(fmt.Sprintf("%s USD", fee))))
   } else if signal == DowntrendDetected && o.position == holding {
     //
     // Calculate the transaction fee.
@@ -202,11 +204,12 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal) {
     //
     // Build out a message explaining how much was spent on transaction fees during this mock trade.
     //
-    feeMsg = fmt.Sprintf("Fees were %s.", aurora.Bold(aurora.Yellow(fmt.Sprintf("%s %s", fee, o.asset))))
+    feeMsg = fmt.Sprintf("Fees were %s.", aurora.Bold(aurora.Blue(fmt.Sprintf("%s %s", fee, o.asset))))
 
     //
     // Since we are now holding USD again, build out a message that explains the current running
-    // USD gain/loss.
+    // USD gain/loss. Also, notify the Writer Service so that it can track the data point if it
+    // cares.
     //
     if o.mockUSDGain.GreaterThan(decimal.Zero) {
       gainMsg = fmt.Sprintf(
@@ -219,6 +222,8 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal) {
         aurora.Bold(aurora.Red(fmt.Sprintf("%s USD", o.mockUSDGain))),
       )
     }
+
+    go writer.Instance().Write(timestamp, writer.GrossMockEarnings, o.mockUSDGain)
   }
 
   //

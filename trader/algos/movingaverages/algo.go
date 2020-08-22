@@ -308,7 +308,7 @@ func (o *Algo) emitSignal(signal broker.Signal, candle *candle.Candle) {
   //
   // Actually emit the signal to the Broker Service.
   //
-  broker.Instance().Signal(signal, candle.CloseAmt())
+  broker.Instance().Signal(signal, candle.CloseAmt(), candle.End())
 
   //
   // Cache the just-emitted signal in case we want to refer back to it at any point (e.g. in tests

@@ -4,35 +4,41 @@ import (
   "encoding/csv"
   "flag"
   "fmt"
+  "github.com/shopspring/decimal"
   "log"
   "os"
   "sync"
+  "time"
 )
 
 const (
-  LogPrefix     = "≪writer-service≫"
-  TimestampKey  = "Timestamp"
-  CategoryKey   = "Category"
-  ValueKey      = "Value"
-  ClosingPrice  = "ClosingPrice"
-  GrossEarnings = "GrossEarnings"
+  ServiceName  = "≪writer-service≫"
+  TimestampKey = "Timestamp"
+  CategoryKey  = "Category"
+  ValueKey     = "Value"
 )
 
 var (
   o    *Service
   once sync.Once
+  logger *log.Logger
 
   cfgOutputDir *string
 )
 
 func init() {
   //
+  // Initialize the logger.
+  //
+  logger = log.New(log.Writer(), fmt.Sprintf("%-20s ", ServiceName), log.Ldate | log.Ltime | log.Lmsgprefix)
+
+  //
   // Determine the current working directory. If that cannot be done for some reason, we are in a
   // critical failure state.
   //
   workingDir, err := os.Getwd()
   if err != nil {
-    log.Fatalf("%s Failed to determine the current working directory. (Error: %s)", LogPrefix, err)
+    logger.Fatalf("Failed to determine the current working directory. (Error: %s)", err)
   }
 
   //
@@ -43,7 +49,7 @@ func init() {
     workingDir,
     fmt.Sprintf(
       "The directory %s service should output CSV files with performance data to.",
-      LogPrefix,
+      ServiceName,
     ),
   )
 }
@@ -84,11 +90,6 @@ func (o *Service) Start() (<-chan bool, error) {
   defer o.mu.Unlock()
 
   //
-  // Validate that necessary configurations have been provided.
-  //
-  // TODO ~> This.
-
-  //
   // (Re)initialize our instance variables.
   //
   o.chKill = make(chan bool, 1)
@@ -102,17 +103,24 @@ func (o *Service) Start() (<-chan bool, error) {
   outputFilePath := o.outputDir + "/goose.csv"
   o.outputFile, err = os.Create(outputFilePath)
   if err != nil {
+    o.chStopped <- true
+
     return o.chStopped, err
   }
 
-  log.Printf("%s Outputing CSV to %s.", LogPrefix, outputFilePath)
+  logger.Printf("Outputing CSV to %s.", outputFilePath)
 
   //
   // Create the CSV writer and use it to write out the header row.
   //
   o.writer = csv.NewWriter(o.outputFile)
 
-  o.writer.Write([]string{TimestampKey, CategoryKey, ValueKey})
+  err = o.writer.Write([]string{TimestampKey, CategoryKey, ValueKey})
+  if err != nil {
+    o.chStopped <- true
+
+    return o.chStopped, err
+  }
 
   //
   // Fire off a goroutine as the executor for the service.
@@ -125,7 +133,7 @@ func (o *Service) Start() (<-chan bool, error) {
   chStarted := make(chan bool, 1)
   chStarted <- true
 
-  log.Printf("%s The service has started.", LogPrefix)
+  logger.Printf("Started.")
 
   return chStarted, nil
 }
@@ -142,7 +150,7 @@ func (o *Service) Stop() (<-chan bool, error) {
   //
   // Log some debug info.
   //
-  log.Printf("%s The service is stopping...", LogPrefix)
+  logger.Printf("Stopping...")
 
   //
   // Tell the goroutines that were spun off by the service to shutdown.
@@ -154,6 +162,24 @@ func (o *Service) Stop() (<-chan bool, error) {
   // service has completely shutdown.
   //
   return o.chStopped, nil
+}
+
+//
+// Write outputs the provided data point to the current CSV output file.
+//
+// NOTE ~> This method logs its own failures, but also returns them in case the caller wants to
+//  pivot on them as well.
+//
+func (o *Service) Write(timestamp time.Time, category Type, value decimal.Decimal) error {
+  err := o.writer.Write([]string{timestamp.String(), category.String(), value.String()})
+  if err != nil {
+    logger.Printf(
+      "Failed to write out data point. (Timestamp: %s, Category: %s, Value: %s) (Error: %s)",
+      timestamp, category, value, err,
+    )
+  }
+
+  return err
 }
 
 //
@@ -176,7 +202,7 @@ func (o *Service) service() {
   //
   err := o.outputFile.Close()
   if err != nil {
-    log.Printf("%s Failed to close handle on output file. (Error: %s)", LogPrefix, err)
+    logger.Printf("Failed to close handle on output file. (Error: %s)", err)
   }
 
   //

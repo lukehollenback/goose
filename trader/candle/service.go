@@ -2,6 +2,7 @@ package candle
 
 import (
   "errors"
+  "github.com/lukehollenback/goose/trader/writer"
   "github.com/shopspring/decimal"
   "log"
   "sync"
@@ -139,13 +140,17 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) (*Candles, error) 
   closedCandles := &Candles{}
 
   //
-  // Append the trade to the fifteen-minute candle store.
+  // Append the trade to the one-minute candle store. We also report one-minute candle closes to
+  // the Writer Service so that it can track the moving price of the asset being traded against
+  // any other data points it is tracking.
   //
   createdNewCandle, err := o.oneMinStore.Append(time, amt)
   if err != nil {
     return nil, err
   } else if createdNewCandle {
     closedCandles.OneMin = o.oneMinStore.Previous()
+
+    go writer.Instance().Write(closedCandles.OneMin.End(), writer.ClosingPrice, closedCandles.OneMin.CloseAmt())
 
     log.Printf("1 Min ↝ %s", closedCandles.OneMin)
   }
