@@ -173,9 +173,9 @@ func (o *Service) Write(timestamp time.Time, category Type, value decimal.Decima
   var err error
 
   if category == ClosingPrice {
-    err = o.writer.Write([]string{timestamp.String(), value.String(), nil})
+    err = o.writer.Write([]string{timestamp.String(), value.String(), ""})
   } else if category == GrossMockEarnings {
-    err = o.writer.Write([]string{timestamp.String(), nil, value.String()})
+    err = o.writer.Write([]string{timestamp.String(), "", value.String()})
   }
 
   if err != nil {
