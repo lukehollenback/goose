@@ -2,6 +2,7 @@ package monitor
 
 import (
   "fmt"
+  "github.com/lukehollenback/goose/constants"
   "github.com/lukehollenback/goose/trader/candle"
   "github.com/shopspring/decimal"
   "log"
@@ -11,10 +12,22 @@ import (
   coinbasepro "github.com/preichenberger/go-coinbasepro/v2"
 )
 
-var (
-  o    *Service
-  once sync.Once
+const (
+  Name = "≪monitor-service≫"
 )
+
+var (
+  o      *Service
+  once   sync.Once
+  logger *log.Logger
+)
+
+func init() {
+  //
+  // Initialize the logger.
+  //
+  logger = log.New(log.Writer(), fmt.Sprintf(constants.LogPrefixFmt, Name), log.Ldate|log.Ltime|log.Lmsgprefix)
+}
 
 //
 // Service represents a match monitor service instance.
@@ -134,7 +147,7 @@ func (o *Service) Start() (<-chan bool, error) {
   chStarted := make(chan bool, 1)
   chStarted <- true
 
-  log.Printf("The match monitor service has started.")
+  logger.Printf("Started.")
 
   return chStarted, nil
 }
@@ -151,7 +164,7 @@ func (o *Service) Stop() (<-chan bool, error) {
   //
   // Log some debug info.
   //
-  log.Printf("The match monitor service is stopping...")
+  logger.Printf("Stopping...")
 
   //
   // Tell the goroutines that were spun off by the service to shutdown.
@@ -280,7 +293,7 @@ func (o *Service) handleMessage(msg *coinbasepro.Message) {
       //
       o.state = subscribed
 
-      log.Printf("Successfully subscribed to relevant Coinbase Pro websocket channels (Market = %s).", o.market)
+      logger.Printf("Successfully subscribed to relevant Coinbase Pro websocket channels (Market: %s).", o.market)
     }
   } else if o.state == subscribed {
     if msg.Type == "last_match" {

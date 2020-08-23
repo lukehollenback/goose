@@ -15,12 +15,14 @@ import (
 )
 
 const (
-  LogPrefix = "≪moving-averages≫"
+  Name = "≪moving-averages≫"
 )
 
 var (
-  o           *Algo
-  once        sync.Once
+  o      *Algo
+  once   sync.Once
+  logger *log.Logger
+
   cfgPeriod   *int
   cfgLongLen  *int
   cfgShortLen *int
@@ -29,6 +31,11 @@ var (
 
 func init() {
   //
+  // Initialize the logger.
+  //
+  logger = log.New(log.Writer(), fmt.Sprintf(constants.LogPrefixFmt, Name), log.Ldate|log.Ltime|log.Lmsgprefix)
+
+  //
   // Register and parse configuration flags.
   //
   cfgPeriod = flag.Int(
@@ -36,7 +43,7 @@ func init() {
     5,
     fmt.Sprintf(
       "The period length (in minutes) that the %s algorithm should watch. Valid values are 1, 5, and 15.",
-      LogPrefix,
+      Name,
     ),
   )
 
@@ -45,7 +52,7 @@ func init() {
     15,
     fmt.Sprintf(
       "The length (in periods) of the long moving average for use by the %s algorithm.",
-      LogPrefix,
+      Name,
     ),
   )
 
@@ -54,7 +61,7 @@ func init() {
     5,
     fmt.Sprintf(
       "The length (in periods) of the short moving average for use by the %s algorithm.",
-      LogPrefix,
+      Name,
     ),
   )
 
@@ -63,7 +70,7 @@ func init() {
     false,
     fmt.Sprintf(
       "Enables exponantial/weighted moving averages for the %s algorithm.",
-      LogPrefix,
+      Name,
     ),
   )
 }
@@ -84,11 +91,11 @@ type Algo struct {
   smaLong      decimal.Decimal // Most-recently-calculated long-duration moving average.
   smaLongPrev  decimal.Decimal // Previously-calculated long-duration moving average.
 
-  emaEnabled            bool            // Whether or not to use the exponential moving average instead of the simple moving average.
-  emaShort              decimal.Decimal // Most-recently-calculated short-duration exponential moving average.
-  emaShortPrev          decimal.Decimal // Previously-calculated short-duration exponential moving average.
-  emaLong               decimal.Decimal // Most-recently-calculated long-duration exponential moving average.
-  emaLongPrev           decimal.Decimal // Previously-calculated long-duration exponential moving average.
+  emaEnabled   bool            // Whether or not to use the exponential moving average instead of the simple moving average.
+  emaShort     decimal.Decimal // Most-recently-calculated short-duration exponential moving average.
+  emaShortPrev decimal.Decimal // Previously-calculated short-duration exponential moving average.
+  emaLong      decimal.Decimal // Most-recently-calculated long-duration exponential moving average.
+  emaLongPrev  decimal.Decimal // Previously-calculated long-duration exponential moving average.
 }
 
 //
@@ -140,9 +147,9 @@ func InitWithFlags(period int, longLen int, shortLen int, exp bool) *Algo {
     //
     // Log some debug info.
     //
-    log.Printf(
-      "%s Initialized. (Period = %d minutes, Long MA = %s periods, Short MA = %s periods, Exponential = %t).",
-      LogPrefix, *cfgPeriod, o.longLen, o.shortLen, o.emaEnabled,
+    logger.Printf(
+      "Initialized. (Period = %d minutes, Long MA = %s periods, Short MA = %s periods, Exponential = %t).",
+      *cfgPeriod, o.longLen, o.shortLen, o.emaEnabled,
     )
   })
 
@@ -258,10 +265,9 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
 
   if o.maShort.Equal(constants.NegOne()) || o.maShortPrev.Equal(constants.NegOne()) ||
       o.maLong.Equal(constants.NegOne()) || o.maLongPrev.Equal(constants.NegOne()) {
-    log.Printf(
-      "%s Not warmed up yet (%d/%s data points collected). One or all moving averages has"+
+    logger.Printf(
+      "Not warmed up yet (%d/%s data points collected). One or all moving averages has"+
           " not yet been calculated.",
-      LogPrefix,
       o.candles.Len(),
       o.longLen.Add(constants.One()),
     )
@@ -282,16 +288,16 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
       // TODO ~> Signal that current position should be held.
     } else {
       if shortAboveLong {
-        log.Printf(
-          "%s Short MA (%s) has crossed ABOVE long MA (%s). This is a %s signal (at %s)!",
-          LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Green("BUY")), newCandle.CloseAmt(),
+        logger.Printf(
+          "Short MA (%s) has crossed ABOVE long MA (%s). This is a %s signal (at %s)!",
+          o.maShort, o.maLong, aurora.Bold(aurora.Green("BUY")), newCandle.CloseAmt(),
         )
 
         o.emitSignal(broker.UptrendDetected, newCandle)
       } else if shortBelowLong {
-        log.Printf(
-          "%s Short MA (%s) has crossed BELOW long MA (%s). This is a %s signal (at %s)!",
-          LogPrefix, o.maShort, o.maLong, aurora.Bold(aurora.Red("SELL")), newCandle.CloseAmt(),
+        logger.Printf(
+          "Short MA (%s) has crossed BELOW long MA (%s). This is a %s signal (at %s)!",
+          o.maShort, o.maLong, aurora.Bold(aurora.Red("SELL")), newCandle.CloseAmt(),
         )
 
         o.emitSignal(broker.DowntrendDetected, newCandle)

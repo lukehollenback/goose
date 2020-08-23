@@ -4,6 +4,7 @@ import (
   "encoding/csv"
   "flag"
   "fmt"
+  "github.com/lukehollenback/goose/constants"
   "github.com/shopspring/decimal"
   "log"
   "os"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-  ServiceName  = "≪writer-service≫"
+  Name         = "≪writer-service≫"
   TimestampKey = "Timestamp"
   CategoryKey  = "Category"
   ValueKey     = "Value"
@@ -30,7 +31,7 @@ func init() {
   //
   // Initialize the logger.
   //
-  logger = log.New(log.Writer(), fmt.Sprintf("%-20s ", ServiceName), log.Ldate | log.Ltime | log.Lmsgprefix)
+  logger = log.New(log.Writer(), fmt.Sprintf(constants.LogPrefixFmt, Name), log.Ldate | log.Ltime | log.Lmsgprefix)
 
   //
   // Determine the current working directory. If that cannot be done for some reason, we are in a
@@ -49,7 +50,7 @@ func init() {
     workingDir,
     fmt.Sprintf(
       "The directory %s service should output CSV files with performance data to.",
-      ServiceName,
+      Name,
     ),
   )
 }

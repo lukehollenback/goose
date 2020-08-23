@@ -3,6 +3,7 @@ package broker
 import (
   "fmt"
   "github.com/logrusorgru/aurora"
+  "github.com/lukehollenback/goose/constants"
   "github.com/lukehollenback/goose/trader/writer"
   "github.com/shopspring/decimal"
   "log"
@@ -10,10 +11,22 @@ import (
   "time"
 )
 
-var (
-  o    *Service
-  once sync.Once
+const (
+  Name = "≪broker-service≫"
 )
+
+var (
+  o      *Service
+  once   sync.Once
+  logger *log.Logger
+)
+
+func init() {
+  //
+  // Initialize the logger.
+  //
+  logger = log.New(log.Writer(), fmt.Sprintf(constants.LogPrefixFmt, Name), log.Ldate | log.Ltime | log.Lmsgprefix)
+}
 
 //
 // Service represents a service instance.
@@ -116,7 +129,7 @@ func (o *Service) Start() (<-chan bool, error) {
   chStarted := make(chan bool, 1)
   chStarted <- true
 
-  log.Printf("The trade broker service has started.")
+  logger.Printf("Started.")
 
   return chStarted, nil
 }
@@ -133,7 +146,7 @@ func (o *Service) Stop() (<-chan bool, error) {
   //
   // Log some debug info.
   //
-  log.Printf("The trade broker service is stopping...")
+  logger.Printf("Stopping...")
 
   //
   // Tell the goroutines that were spun off by the service to shutdown.
@@ -229,7 +242,7 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal, timestamp time.Ti
   //
   // Log details about the current position now that the mock trade has been executed.
   //
-  log.Printf(
+  logger.Printf(
     "Mock trade executed! Current holdings are %s and %s. %s %s",
     aurora.Bold(aurora.Yellow(fmt.Sprintf("%s %s", o.mockBTC, o.asset))),
     aurora.Bold(aurora.Green(fmt.Sprintf("%s USD", o.mockUSD))),

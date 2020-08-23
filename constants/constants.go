@@ -2,6 +2,10 @@ package constants
 
 import "github.com/shopspring/decimal"
 
+const (
+  LogPrefixFmt = "%-17s "
+)
+
 var (
   negOne = decimal.NewFromInt(-1)
   one    = decimal.NewFromInt(1)

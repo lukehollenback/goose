@@ -2,6 +2,8 @@ package candle
 
 import (
   "errors"
+  "fmt"
+  "github.com/lukehollenback/goose/constants"
   "github.com/lukehollenback/goose/trader/writer"
   "github.com/shopspring/decimal"
   "log"
@@ -9,10 +11,22 @@ import (
   "time"
 )
 
-var (
-  o    *Service
-  once sync.Once
+const (
+  Name = "≪candle-service≫"
 )
+
+var (
+  o      *Service
+  once   sync.Once
+  logger *log.Logger
+)
+
+func init() {
+  //
+  // Initialize the logger.
+  //
+  logger = log.New(log.Writer(), fmt.Sprintf(constants.LogPrefixFmt, Name), log.Ldate | log.Ltime | log.Lmsgprefix)
+}
 
 //
 // Service represents a candle store service instance.
@@ -52,7 +66,7 @@ func (o *Service) Start() (<-chan bool, error) {
   chStarted := make(chan bool, 1)
   chStarted <- true
 
-  log.Printf("The candle store service has started.")
+  logger.Printf("Started.")
 
   return chStarted, nil
 }
@@ -69,7 +83,7 @@ func (o *Service) Stop() (<-chan bool, error) {
   //
   // Log some debug info.
   //
-  log.Printf("The candle store service is stopping...")
+  logger.Printf("Stopping...")
 
   //
   // Return the "stopped" channel that the caller can block on if they need to know that the
@@ -152,7 +166,7 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) (*Candles, error) 
 
     go writer.Instance().Write(closedCandles.OneMin.End(), writer.ClosingPrice, closedCandles.OneMin.CloseAmt())
 
-    log.Printf("1 Min ↝ %s", closedCandles.OneMin)
+    logger.Printf("1 Min ↝ %s", closedCandles.OneMin)
   }
 
   //
@@ -164,7 +178,7 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) (*Candles, error) 
   } else if createdNewCandle {
     closedCandles.FiveMin = o.fiveMinStore.Previous()
 
-    log.Printf("5 Min ↝ %s", closedCandles.FiveMin)
+    logger.Printf("5 Min ↝ %s", closedCandles.FiveMin)
   }
 
   //
@@ -176,7 +190,7 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) (*Candles, error) 
   } else if createdNewCandle {
     closedCandles.FifteenMin = o.fifteenMinStore.Previous()
 
-    log.Printf("15 Min ↝ %s", closedCandles.FifteenMin)
+    logger.Printf("15 Min ↝ %s", closedCandles.FifteenMin)
   }
 
   return closedCandles, nil
