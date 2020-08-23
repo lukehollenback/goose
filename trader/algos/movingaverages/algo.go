@@ -40,11 +40,11 @@ func init() {
   // Register and parse configuration flags.
   //
   cfgPrecision = flag.Int(
-    "precision",
+    "ma-precision",
     8,
     fmt.Sprintf(
-      "The number of decimals to which asset values should be rounded to. Common values include 8 (1 Satoshi) "+
-          "for BTC and 7 (1 Stroop) for XLM.",
+      "The number of decimals to which moving averages of asset values should be rounded to. Common values " +
+        "include 8 (1 Satoshi) for BTC and 7 (1 Stroop) for XLM.",
     ),
   )
 

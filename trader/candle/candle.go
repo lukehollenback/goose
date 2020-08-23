@@ -22,7 +22,6 @@ type Candle struct {
   close    decimal.Decimal
   high     decimal.Decimal
   low      decimal.Decimal
-  avg      decimal.Decimal
   total    decimal.Decimal
   cnt      decimal.Decimal
 }
@@ -43,7 +42,6 @@ func CreateCandle(
 		close:    firstAmt,
 		high:     firstAmt,
 		low:      firstAmt,
-		avg:      firstAmt,
 		total:    firstAmt,
 		cnt:      One,
 	}
@@ -63,7 +61,6 @@ func CreateFullCandle(
     close decimal.Decimal,
     high decimal.Decimal,
     low decimal.Decimal,
-    avg decimal.Decimal,
     total decimal.Decimal,
     cnt decimal.Decimal,
 ) *Candle {
@@ -75,7 +72,6 @@ func CreateFullCandle(
     close:    close,
     high:     high,
     low:      low,
-    avg:      avg,
     total:    total,
     cnt:      cnt,
   }
@@ -116,7 +112,6 @@ func (o *Candle) Append(time time.Time, amt decimal.Decimal) error {
 
   o.total = o.total.Add(amt)
   o.cnt = o.cnt.Add(One)
-  o.avg = o.total.Div(o.cnt)
 
   return nil
 }
@@ -205,7 +200,7 @@ func (o *Candle) String() string {
   }
 
   return fmt.Sprintf(
-    "%s (O: %-8s  C: %-8s  H: %-8s  L: %-8s  A: %-22s  C: %-5s  S: %s)",
-    arrow, o.open, o.close, o.high, o.low, o.avg, o.cnt, o.start,
+    "%s (O: %-8s  C: %-8s  H: %-8s  L: %-8s  C: %-5s  S: %s)",
+    arrow, o.open, o.close, o.high, o.low, o.cnt, o.start,
   )
 }
