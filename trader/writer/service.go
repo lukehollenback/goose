@@ -15,8 +15,6 @@ import (
 const (
   Name         = "≪writer-service≫"
   TimestampKey = "Timestamp"
-  CategoryKey  = "Category"
-  ValueKey     = "Value"
 )
 
 var (
@@ -116,7 +114,7 @@ func (o *Service) Start() (<-chan bool, error) {
   //
   o.writer = csv.NewWriter(o.outputFile)
 
-  err = o.writer.Write([]string{TimestampKey, CategoryKey, ValueKey})
+  err = o.writer.Write([]string{TimestampKey, ClosingPrice.String(), GrossMockEarnings.String()})
   if err != nil {
     o.chStopped <- true
 
@@ -172,7 +170,14 @@ func (o *Service) Stop() (<-chan bool, error) {
 //  pivot on them as well.
 //
 func (o *Service) Write(timestamp time.Time, category Type, value decimal.Decimal) error {
-  err := o.writer.Write([]string{timestamp.String(), category.String(), value.String()})
+  var err error
+
+  if category == ClosingPrice {
+    err = o.writer.Write([]string{timestamp.String(), value.String(), nil})
+  } else if category == GrossMockEarnings {
+    err = o.writer.Write([]string{timestamp.String(), nil, value.String()})
+  }
+  
   if err != nil {
     logger.Printf(
       "Failed to write out data point. (Timestamp: %s, Category: %s, Value: %s) (Error: %s)",
