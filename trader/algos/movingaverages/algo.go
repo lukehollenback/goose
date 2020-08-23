@@ -23,10 +23,11 @@ var (
   once   sync.Once
   logger *log.Logger
 
-  cfgPeriod   *int
-  cfgLongLen  *int
-  cfgShortLen *int
-  cfgExp      *bool
+  cfgPrecision *int
+  cfgPeriod    *int
+  cfgLongLen   *int
+  cfgShortLen  *int
+  cfgExp       *bool
 )
 
 func init() {
@@ -38,6 +39,15 @@ func init() {
   //
   // Register and parse configuration flags.
   //
+  cfgPrecision = flag.Int(
+    "precision",
+    8,
+    fmt.Sprintf(
+      "The number of decimals to which asset values should be rounded to. Common values include 8 (1 Satoshi) "+
+          "for BTC and 7 (1 Stroop) for XLM.",
+    ),
+  )
+
   cfgPeriod = flag.Int(
     "ma-period",
     5,
@@ -78,6 +88,8 @@ func init() {
 type Algo struct {
   candles *evictingqueue.EvictingQueue // Holds references to the most recent one-minute candles that have been provided to the algorithm.
 
+  precision int32 // The number of decimals of precision that the asset's prices should be rounded to.
+
   shortLen    decimal.Decimal // Length of the short-duration moving average.
   longLen     decimal.Decimal // Length of the long-duration moving average.
   lastSignal  broker.Signal   // The last signal that was fired by the algorithm.
@@ -110,6 +122,8 @@ func InitWithFlags(period int, longLen int, shortLen int, exp bool) *Algo {
     //
     o = &Algo{
       candles: evictingqueue.New(longLen + 1),
+
+      precision: int32(*cfgPrecision),
 
       shortLen:    decimal.NewFromInt(int64(shortLen)),
       longLen:     decimal.NewFromInt(int64(longLen)),
@@ -355,7 +369,7 @@ func (o *Algo) calculateSimpleMovingAverage(lookback decimal.Decimal) decimal.De
     avg = avg.Add(cur.(*candle.Candle).CloseAmt())
   }
 
-  return avg.Div(lookback)
+  return avg.Div(lookback).Round(o.precision)
 }
 
 //
@@ -380,5 +394,5 @@ func (o *Algo) calculateExponentialMovingAverage(
   //
   // Calculate and return the EMA.
   //
-  return curCloseAmt.Sub(prevEMA).Mul(factor).Add(prevEMA)
+  return curCloseAmt.Sub(prevEMA).Mul(factor).Add(prevEMA).Round(o.precision)
 }

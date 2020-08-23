@@ -177,7 +177,7 @@ func (o *Service) Write(timestamp time.Time, category Type, value decimal.Decima
   } else if category == GrossMockEarnings {
     err = o.writer.Write([]string{timestamp.String(), nil, value.String()})
   }
-  
+
   if err != nil {
     logger.Printf(
       "Failed to write out data point. (Timestamp: %s, Category: %s, Value: %s) (Error: %s)",
