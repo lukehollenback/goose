@@ -122,11 +122,6 @@ func (o *Service) Start() (<-chan bool, error) {
   }
 
   //
-  // Fire off a goroutine as the executor for the service.
-  //
-  go o.service()
-
-  //
   // Return our "started" channel in case the caller wants to block on it and log some debug info.
   //
   chStarted := make(chan bool, 1)
@@ -155,6 +150,24 @@ func (o *Service) Stop() (<-chan bool, error) {
   // Tell the goroutines that were spun off by the service to shutdown.
   //
   o.chKill <- true
+
+  //
+  // Flush the CSV writer's buffer to the output file.
+  //
+  o.writer.Flush()
+
+  //
+  // Close the handle on the output file.
+  //
+  err := o.outputFile.Close()
+  if err != nil {
+    logger.Printf("Failed to close handle on output file. (Error: %s)", err)
+  }
+
+  //
+  // Send the signal that we have shut down.
+  //
+  o.chStopped <- true
 
   //
   // Return the "stopped" channel that the caller can block on if they need to know that the
@@ -186,33 +199,4 @@ func (o *Service) Write(timestamp time.Time, category Type, value decimal.Decima
   }
 
   return err
-}
-
-//
-// service executes the top-level logic of the service. It is intended to be spun off into its own
-// goroutine when the service is started.
-//
-func (o *Service) service() {
-  //
-  // Yield indefinitely.
-  //
-  <-o.chKill
-
-  //
-  // Flush the CSV writer's buffer to the output file.
-  //
-  o.writer.Flush()
-
-  //
-  // Close the handle on the output file.
-  //
-  err := o.outputFile.Close()
-  if err != nil {
-    logger.Printf("Failed to close handle on output file. (Error: %s)", err)
-  }
-
-  //
-  // Send the signal that we have shut down.
-  //
-  o.chStopped <- true
 }

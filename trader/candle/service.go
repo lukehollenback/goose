@@ -164,7 +164,7 @@ func (o *Service) Append(time time.Time, amt decimal.Decimal) (*Candles, error) 
   } else if createdNewCandle {
     closedCandles.OneMin = o.oneMinStore.Previous()
 
-    go writer.Instance().Write(closedCandles.OneMin.End(), writer.ClosingPrice, closedCandles.OneMin.CloseAmt())
+    _ = writer.Instance().Write(closedCandles.OneMin.End(), writer.ClosingPrice, closedCandles.OneMin.CloseAmt())
 
     logger.Printf("1 Min ↝ %s", closedCandles.OneMin)
   }

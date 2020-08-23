@@ -114,11 +114,6 @@ func (o *Service) Start() (<-chan bool, error) {
   o.chStopped = make(chan bool, 1)
 
   //
-  // Fire off a goroutine as the executor for the service.
-  //
-  go o.service()
-
-  //
   // Adjust the tracked position (a.k.a. state) of the service to indicate that it is now running.
   //
   o.position = waiting
@@ -158,6 +153,11 @@ func (o *Service) Stop() (<-chan bool, error) {
   // running.
   //
   o.position = offline
+
+  //
+  // Send the signal that we have shut down.
+  //
+  o.chStopped <- true
 
   //
   // Return the "stopped" channel that the caller can block on if they need to know that the
@@ -236,7 +236,7 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal, timestamp time.Ti
       )
     }
 
-    go writer.Instance().Write(timestamp, writer.GrossMockEarnings, o.mockUSDGain)
+    _ = writer.Instance().Write(timestamp, writer.GrossMockEarnings, o.mockUSDGain)
   }
 
   //
@@ -249,22 +249,4 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal, timestamp time.Ti
     feeMsg,
     gainMsg,
   )
-}
-
-//
-// service executes the top-level logic of the service. It is intended to be spun off into its own
-// goroutine when the service is started.
-//
-func (o *Service) service() {
-  //
-  // Yield indefinitely.
-  //
-  // TODO ~> Maintain authentication with the Coinbase Pro API and execute trades.
-  //
-  <-o.chKill
-
-  //
-  // Send the signal that we have shut down.
-  //
-  o.chStopped <- true
 }
