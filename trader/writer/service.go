@@ -80,9 +80,7 @@ func Instance() *Service {
 }
 
 //
-// Start fires up the service. It is up to the caller to not call this multiple times in a row
-// without stopping the service and waiting for full termination in between. A channel that can be
-// blocked on for a "true" value – which indicates that start up is complete – is returned.
+// Start implements the Service interface's described method.
 //
 func (o *Service) Start() (<-chan bool, error) {
   o.mu.Lock()
@@ -133,9 +131,7 @@ func (o *Service) Start() (<-chan bool, error) {
 }
 
 //
-// Stop tells the service to shut down. It is up to the caller to not call this multiple times in
-// a row without starting the service first. A channel that can be blocked on for a "true" value –
-// which indicates that shut down is complete – is returned.
+// Stop implements the Service interface's described method.
 //
 func (o *Service) Stop() (<-chan bool, error) {
   o.mu.Lock()
