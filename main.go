@@ -3,6 +3,8 @@ package main
 import (
   "flag"
   "fmt"
+  "github.com/lukehollenback/goose/exchange"
+  "github.com/lukehollenback/goose/exchange/binance"
   "github.com/lukehollenback/goose/trader/algos/movingaverages"
   "github.com/lukehollenback/goose/trader/broker"
   "github.com/lukehollenback/goose/trader/writer"
@@ -10,6 +12,7 @@ import (
   "log"
   "os"
   "os/signal"
+  "time"
 
   "github.com/lukehollenback/goose/trader/candle"
   "github.com/lukehollenback/goose/trader/monitor"
@@ -30,6 +33,18 @@ func main() {
   // NOTE ~> Individual services and algorithms might register their own flags in their package
   //  initialization functions. This, however, is the only place where they are parsed.
   //
+  cfgBinanceAPIKey := flag.String(
+    "binance-key",
+    "none",
+    fmt.Sprintf("The API key to use when interacting with the Binance.US API."),
+  )
+
+  cfgBinanceAPISecret := flag.String(
+    "binance-secret",
+    "none",
+    fmt.Sprintf("The secret to use for signing requests when interacting with the Binance.US API."),
+  )
+
   cfgAsset := flag.String(
     "asset",
     "BTC",
@@ -55,6 +70,20 @@ func main() {
   )
 
   flag.Parse()
+
+  /////////
+  client := binance.NewClient()
+  client.Auth(*cfgBinanceAPIKey, *cfgBinanceAPISecret)
+  client.RetrieveCandles(
+    "BTCUSD",
+    exchange.OneMinute,
+    time.Date(2020, time.June, 1, 0, 0, 0, 0, time.UTC),
+    time.Date(2020, time.June, 1, 0, 59, 59, 999999999, time.UTC),
+    1000,
+  )
+
+  os.Exit(0)
+  /////////
 
   //
   // Start up the Writer Service.
