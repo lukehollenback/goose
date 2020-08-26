@@ -7,12 +7,12 @@ package exchange
 type APIError interface {
 
   //
-  // Code returns the actual error code provided by the API (if there was one).
+  // ErrorCode returns the actual error code provided by the API (if there was one).
   //
-  Code() int
+  ErrorCode() int
 
   //
-  // Message returns the actual error message provided by the API (if there was one).
+  // ErrorMessage returns the actual error message provided by the API (if there was one).
   //
   Message() string
 

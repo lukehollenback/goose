@@ -158,3 +158,35 @@ func (o *Candle) UnmarshalJSON(data []byte) error {
   //
   return nil
 }
+
+func (o *Candle) StartTime() *time.Time {
+  return &o.start
+}
+
+func (o *Candle) EndTime() *time.Time {
+  return &o.end
+}
+
+func (o *Candle) Open() *decimal.Decimal {
+  return &o.open
+}
+
+func (o *Candle) High() *decimal.Decimal {
+  return &o.high
+}
+
+func (o *Candle) Low() *decimal.Decimal {
+  return &o.low
+}
+
+func (o *Candle) Close() *decimal.Decimal {
+  return &o.close
+}
+
+func (o *Candle) Volume() *decimal.Decimal {
+  return &o.volume
+}
+
+func (o *Candle) Count() *int {
+  return &o.count
+}

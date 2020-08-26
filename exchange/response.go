@@ -17,6 +17,6 @@ type Response interface {
   // Candles provides a slice of the candles returned from the endpoint call that was made (if there
   // were any).
   //
-  Candles() []*Candle
+  Candles() []Candle
 
 }

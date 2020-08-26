@@ -21,12 +21,13 @@ type Client interface {
   // be returned. Others will simply store the information for use in headers, in which case the
   // returned response future will be meaningless.
   //
-  Auth(key string, secret string) (*Response, error)
+  Auth(key string, secret string) (Response, error)
 
   //
   // RetrieveCandles retrieves candles of the specified interval for the specified ticker symbol
   // within the specified time range. A maximum of the specified limit of candles will be returned
   // (note that many exchanges impose a hard maximum on the limit – usually at around 1000 candles).
   //
-  RetrieveCandles(symbol string, interval Interval, start time.Time, end time.Time, limit int) (*Response, error)
+  RetrieveCandles(symbol string, interval Interval, start time.Time, end time.Time, limit int) (Response, error)
+
 }

@@ -74,13 +74,16 @@ func main() {
   /////////
   client := binance.NewClient()
   client.Auth(*cfgBinanceAPIKey, *cfgBinanceAPISecret)
-  client.RetrieveCandles(
+  res, err := client.RetrieveCandles(
     "BTCUSD",
     exchange.OneMinute,
     time.Date(2020, time.June, 1, 0, 0, 0, 0, time.UTC),
     time.Date(2020, time.June, 1, 0, 59, 59, 999999999, time.UTC),
     1000,
   )
+
+  log.Printf("%s", err)
+  log.Printf("%+v", res)
 
   os.Exit(0)
   /////////

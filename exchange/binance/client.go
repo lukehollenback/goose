@@ -24,20 +24,20 @@ func NewClient() *Client {
   }
 }
 
-func (o *Client) Auth(key string, secret string) (*Response, error) {
+func (o *Client) Auth(key string, secret string) (exchange.Response, error) {
   o.apiKey = key
   o.apiSecret = secret
 
   return nil, nil
 }
 
-func (o *Client) RetrieveCandles(
+func (o Client) RetrieveCandles(
     symbol string,
     interval exchange.Interval,
     start time.Time,
     end time.Time,
     limit int,
-) (*Response, error) {
+) (exchange.Response, error) {
   //
   // Build request URL.
   //
@@ -74,13 +74,27 @@ func (o *Client) RetrieveCandles(
   }
 
   //
-  // Parse the response.
+  // Read the response.
   //
   body, err := ioutil.ReadAll(resp.Body)
   if err != nil {
     return wrappedResp, err
   }
 
+  //
+  // Check the response for API errors.
+  //
+  var apiErr *APIError
+
+  _ = json.Unmarshal(body, &apiErr)
+
+  if apiErr.populated() {
+    return wrappedResp, apiErr
+  }
+
+  //
+  // Parse the response
+  //
   var candles []*Candle
 
   err = json.Unmarshal(body, &candles)

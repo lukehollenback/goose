@@ -1,6 +1,7 @@
 package binance
 
 import (
+  "github.com/lukehollenback/goose/exchange"
   "net/http"
 )
 
@@ -17,6 +18,12 @@ func (o *Response) Raw() *http.Response {
   return o.response
 }
 
-func (o *Response) Candles() []*Candle {
-  return o.candles
+func (o *Response) Candles() []exchange.Candle {
+  ret := make([]exchange.Candle, len(o.candles))
+
+  for i, v := range o.candles {
+    ret[i] = v
+  }
+
+  return ret
 }
