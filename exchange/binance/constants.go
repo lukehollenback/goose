@@ -1,8 +1,8 @@
 package binance
 
 const (
-  ApiKeyHeader = "X-MBX-APIKEY"
+  APIKeyHeader = "X-MBX-APIKEY"
 
-  BaseUrl    = "https://api.binance.us"
-  CandlesUrl = BaseUrl + "/api/v3/klines"
+  BaseURL    = "https://api.binance.us"
+  CandlesURL = BaseURL + "/api/v3/klines"
 )

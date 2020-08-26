@@ -11,6 +11,12 @@ type HTTPError struct {
   statusCode int
 }
 
+func NewHTTPError(statusCode int) *HTTPError {
+  return &HTTPError{
+    statusCode: statusCode,
+  }
+}
+
 func (o *HTTPError) StatusCode() int {
   return o.statusCode
 }
