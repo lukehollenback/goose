@@ -4,6 +4,7 @@ import (
   "flag"
   "fmt"
   "github.com/lukehollenback/goose/constants"
+  "github.com/lukehollenback/goose/exchange"
   "github.com/lukehollenback/goose/trader/candle"
   "github.com/shopspring/decimal"
   "log"
@@ -65,6 +66,8 @@ type Service struct {
   chKill    chan bool
   chStopped chan bool
 
+  client exchange.Client
+
   backtest      bool
   backtestStart time.Time
   backtestEnd   time.Time
@@ -108,17 +111,17 @@ func Instance() *Service {
     // Parse the backtest start and end timestamps if backtesting has been enabled.
     //
     if o.backtest {
-      o.backtestStart, err = time.Parse("", *cfgBacktestStart)
+      o.backtestStart, err = time.Parse("2006-01-02 03:04", *cfgBacktestStart)
       if err != nil {
-        log.Fatalf("Failed to instantiate. Backtest start timestamp could not be parsed. (Error: %s)", err)
+        logger.Fatalf("Failed to instantiate. Backtest start timestamp could not be parsed. (Error: %s)", err)
       }
 
-      o.backtestEnd, err = time.Parse("", *cfgBacktestEnd)
+      o.backtestEnd, err = time.Parse("2006-01-02 03:04", *cfgBacktestEnd)
       if err != nil {
-        log.Fatalf("Failed to instantiate. Backtest end timestamp could not be parsed. (Error: %s)", err)
+        logger.Fatalf("Failed to instantiate. Backtest end timestamp could not be parsed. (Error: %s)", err)
       }
 
-      log.Printf("Enabled backtesting. (Start: %s, End: %s)", o.backtestStart, o.backtestEnd)
+      logger.Printf("Enabled backtesting. (Start: %s, End: %s)", o.backtestStart, o.backtestEnd)
     }
   })
 
@@ -130,7 +133,15 @@ func Instance() *Service {
 //
 func (o *Service) SetAsset(asset string) {
   o.asset = asset
-  o.market = fmt.Sprintf("%s-USD", asset)
+  o.market = o.client.RetrieveSymbol(asset, "USD")
+}
+
+//
+// SetClient tells the Monitor Service which client instance it should use to communicate with the
+// relevant exchange's REST API (e.g. for loading historical data).
+//
+func (o *Service) SetClient(client exchange.Client) {
+  o.client = client
 }
 
 //
@@ -240,6 +251,133 @@ func (o *Service) Stop() (<-chan bool, error) {
 // can determine when to buy or sell currency.
 //
 func (o *Service) service() {
+  //
+  // Execute the appropriate monitor.
+  //
+  if o.backtest {
+    o.backtestTrades()
+  } else {
+    o.monitorLiveTrades()
+  }
+
+  //
+  // Send the signal that we have shut down.
+  //
+  o.chStopped <- true
+}
+
+//
+// backtestTrades loads historical handles from the relevant exchange API and converts them directly
+// into candles that it can produce.
+//
+func (o *Service) backtestTrades() {
+  //
+  // Retrieve, process, and produce historical candles from the relevant exchange's API for the
+  // configured backtest period.
+  //
+  for s, e, c := o.obtainBacktestCursors(nil); c; s, e, c = o.obtainBacktestCursors(s) {
+    //
+    // Log some debug info.
+    //
+    logger.Printf("Loading historical candles from %s through %s.", s, e)
+
+    //
+    // Load historical candles.
+    //
+    oneMinResp, err := o.client.RetrieveCandles(o.market, exchange.OneMinute, *s, *e, 1000)
+    if err != nil {
+      logger.Fatalf("Failed to load historical one minute candles. (Error: %s)", err)
+    }
+
+    fiveMinResp, err := o.client.RetrieveCandles(o.market, exchange.FiveMinute, *s, *e, 1000)
+    if err != nil {
+      logger.Fatalf("Failed to load historical five minute candles. (Error: %s)", err)
+    }
+
+    fifteenMinResp, err := o.client.RetrieveCandles(o.market, exchange.FifteenMinute, *s, *e, 1000)
+    if err != nil {
+      logger.Fatalf("Failed to load historical fifteen minute candles. (Error: %s)", err)
+    }
+
+    //
+    // Log some debug info.
+    //
+    logger.Printf(
+      "Loaded %d one minute, %d five minute, and %d fifteen minute candles.",
+      len(oneMinResp.Candles()), len(fiveMinResp.Candles()), len(fifteenMinResp.Candles()),
+    )
+
+    //
+    // Process and produce historical candles.
+    //
+    for _, v := range oneMinResp.Candles() {
+      // NOTE ~> We will always have a one minute candle. Occasionally we'll have a five minute
+      //  candle or a fifteen minute candle.
+
+      candles := &candle.Candles{
+        OneMin: candle.CreateFullCandle(*(v.StartTime()), candle.OneMin, *(v.Open()), *(v.Close()), *(v.High()), *(v.Low()), *(v.Volume()), decimal.NewFromInt(int64(*(v.Count())))),
+      }
+
+      if fiveMinResp.Candles()[0].EndTime().Equal(*v.EndTime()) {
+        v := fiveMinResp.Candles()[0]
+        candles.FiveMin = candle.CreateFullCandle(*(v.StartTime()), candle.OneMin, *(v.Open()), *(v.Close()), *(v.High()), *(v.Low()), *(v.Volume()), decimal.NewFromInt(int64(*(v.Count()))))
+      }
+
+      if fifteenMinResp.Candles()[0].EndTime().Equal(*v.EndTime()) {
+        v := fifteenMinResp.Candles()[0]
+        candles.FiveMin = candle.CreateFullCandle(*(v.StartTime()), candle.OneMin, *(v.Open()), *(v.Close()), *(v.High()), *(v.Low()), *(v.Volume()), decimal.NewFromInt(int64(*(v.Count()))))
+      }
+
+      o.processClosedCandles(candles)
+    }
+  }
+
+  //
+  // Log some debug info.
+  //
+  logger.Printf("Backtesting has completed.")
+}
+
+//
+// obtainBacktestCursors initializes or slides the start and end timestamp cursors being used to
+// retrieve historical candles. Slides the window by twelve hours each call.
+//
+func (o *Service) obtainBacktestCursors(prevStart *time.Time) (*time.Time, *time.Time, bool) {
+  var start time.Time
+  var end time.Time
+  var cont = true
+
+  //
+  // Prime or update the head cursor.
+  //
+  if prevStart == nil {
+    start = o.backtestStart
+  } else {
+    start = prevStart.Add(constants.TwelveHours)
+  }
+
+  //
+  // Update the tail cursor and see if we are at the end of our backtest period.
+  //
+  end = start.Add(constants.TwelveHours).Add(-1 * time.Nanosecond)
+
+  if end.After(o.backtestEnd) {
+    end = o.backtestEnd
+    cont = false
+  }
+
+  //
+  // Return the new head cursor, the new tail cursor, and a sentinel indicating whether or not we
+  // have reached the end of our backtest period.
+  //
+  return &start, &end, cont
+}
+
+//
+// monitorLiveTrades actually monitors trades as received from the relevant exchange's websocket
+// feed in realtime to produce candles.
+//
+func (o *Service) monitorLiveTrades() {
   var err error
 
   //
@@ -323,11 +461,6 @@ func (o *Service) service() {
   }
 
   o.state = disconnected
-
-  //
-  // Send the signal that we have shut down.
-  //
-  o.chStopped <- true
 }
 
 func (o *Service) readNextMessage(chMsg chan<- *coinbasepro.Message, chErr chan<- error) {

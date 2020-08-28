@@ -78,6 +78,10 @@ func (o Client) RetrieveCandles(
   return resp, nil
 }
 
+func (o *Client) RetrieveSymbol(source string, dest string) string {
+  return fmt.Sprintf("%s%s", source, dest)
+}
+
 //
 // request makes the specified request to the Binance.US API and returns a wrapped response (parsed
 // as much as generically possible) and/or an error if something went wrong.

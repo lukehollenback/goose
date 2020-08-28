@@ -30,4 +30,11 @@ type Client interface {
   //
   RetrieveCandles(symbol string, interval Interval, start time.Time, end time.Time, limit int) (Response, error)
 
+  //
+  // RetrieveSymbol retrieves or generates the appropriate symbol for the provided source and
+  // destination assets. For example, Coinbase Pro's "BTC-USD" market might be the equivelant of
+  // Binance.US' "BTCUSD" market.
+  //
+  RetrieveSymbol(source string, dest string) string
+
 }

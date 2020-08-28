@@ -1,9 +1,13 @@
 package constants
 
-import "github.com/shopspring/decimal"
+import (
+  "github.com/shopspring/decimal"
+  "time"
+)
 
 const (
   LogPrefixFmt = "%-17s "
+  TwelveHours = 12 * time.Hour
 )
 
 var (

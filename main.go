@@ -3,19 +3,16 @@ package main
 import (
   "flag"
   "fmt"
-  "github.com/lukehollenback/goose/exchange"
   "github.com/lukehollenback/goose/exchange/binance"
   "github.com/lukehollenback/goose/trader/algos/movingaverages"
   "github.com/lukehollenback/goose/trader/broker"
+  "github.com/lukehollenback/goose/trader/candle"
+  "github.com/lukehollenback/goose/trader/monitor"
   "github.com/lukehollenback/goose/trader/writer"
   "github.com/shopspring/decimal"
   "log"
   "os"
   "os/signal"
-  "time"
-
-  "github.com/lukehollenback/goose/trader/candle"
-  "github.com/lukehollenback/goose/trader/monitor"
 )
 
 func main() {
@@ -71,22 +68,16 @@ func main() {
 
   flag.Parse()
 
-  /////////
+  //
+  // Instantiate and authenticate with a financial exchange's REST API.
+  //
   client := binance.NewClient()
-  client.Auth(*cfgBinanceAPIKey, *cfgBinanceAPISecret)
-  resp, err := client.RetrieveCandles(
-    "BTCUSD",
-    exchange.OneMinute,
-    time.Date(2020, time.June, 1, 0, 0, 0, 0, time.UTC),
-    time.Date(2020, time.June, 1, 1, 0, 0, 0, time.UTC),
-    1000,
-  )
+  _, _ = client.Auth(*cfgBinanceAPIKey, *cfgBinanceAPISecret)
 
-  log.Printf("%s", resp.Candles()[0].StartTime().UTC())
-  log.Printf("%s", resp.Candles()[59].EndTime().UTC())
-
-  os.Exit(0)
-  /////////
+  //
+  // Start the desired algorithm(s).
+  //
+  movingaverages.Init()
 
   //
   // Start up the Writer Service.
@@ -121,6 +112,7 @@ func main() {
   //
   // Start up the Monitor Service.
   //
+  monitor.Instance().SetClient(client)
   monitor.Instance().SetAsset(*cfgAsset)
   chMonitorStarted, err := monitor.Instance().Start()
   if err != nil {
@@ -134,11 +126,6 @@ func main() {
   <-chCandleStarted
   <-chBrokerStarted
   <-chMonitorStarted
-
-  //
-  // Start the desired algorithm(s).
-  //
-  movingaverages.Init()
 
   //
   // Block until we are shut down by the operating system.
