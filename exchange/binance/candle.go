@@ -78,14 +78,14 @@ func (o *Candle) UnmarshalJSON(data []byte) error {
     return fmt.Errorf("failed to assert type of start (open) time (%+v)", raw[StartTimeIndex])
   }
 
-  o.start = time.Unix(0, int64(startRaw))
+  o.start = time.Unix(0, int64(startRaw) * MillisInNano)
 
   endRaw, ok := raw[EndTimeIndex].(float64)
   if !ok {
     return fmt.Errorf("failed to assert type of end (close) time (%+v)", raw[EndTimeIndex])
   }
 
-  o.end = time.Unix(0, int64(endRaw))
+  o.end = time.Unix(0, int64(endRaw) * MillisInNano)
 
   //
   // Parse the open, high, low, and close values of the candle.

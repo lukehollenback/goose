@@ -1,12 +1,14 @@
 package monitor
 
 import (
+  "flag"
   "fmt"
   "github.com/lukehollenback/goose/constants"
   "github.com/lukehollenback/goose/trader/candle"
   "github.com/shopspring/decimal"
   "log"
   "sync"
+  "time"
 
   ws "github.com/gorilla/websocket"
   coinbasepro "github.com/preichenberger/go-coinbasepro/v2"
@@ -20,6 +22,10 @@ var (
   o      *Service
   once   sync.Once
   logger *log.Logger
+
+  cfgBacktest      *bool
+  cfgBacktestStart *string
+  cfgBacktestEnd   *string
 )
 
 func init() {
@@ -27,19 +33,48 @@ func init() {
   // Initialize the logger.
   //
   logger = log.New(log.Writer(), fmt.Sprintf(constants.LogPrefixFmt, Name), log.Ldate|log.Ltime|log.Lmsgprefix)
+
+  //
+  // Register and parse configuration flags.
+  //
+  cfgBacktest = flag.Bool(
+    "backtest",
+    false,
+    "Whether or not to run as a backtest. Does NOT enable mocking NOR disable real trading by default. Be "+
+        "careful.",
+  )
+
+  cfgBacktestStart = flag.String(
+    "backtest-start",
+    "2006-01-02 03:04",
+    "The desired backtest start timestamp.",
+  )
+
+  cfgBacktestEnd = flag.String(
+    "backtest-end",
+    "2006-01-02 03:04",
+    "The desired backtest end timestamp.",
+  )
 }
 
 //
 // Service represents a match monitor service instance.
 //
 type Service struct {
-  mu                              *sync.Mutex
-  state                           state
-  conn                            *ws.Conn
-  chKill                          chan bool
-  chStopped                       chan bool
-  asset                           string
-  market                          string
+  mu        *sync.Mutex
+  chKill    chan bool
+  chStopped chan bool
+
+  backtest      bool
+  backtestStart time.Time
+  backtestEnd   time.Time
+
+  state state
+  conn  *ws.Conn
+
+  asset  string
+  market string
+
   onOneMinCandleCloseHandlers     []func(*candle.Candle)
   onFiveMinCandleCloseHandlers    []func(*candle.Candle)
   onFifteenMinCandleCloseHandlers []func(*candle.Candle)
@@ -51,13 +86,39 @@ type Service struct {
 //
 func Instance() *Service {
   once.Do(func() {
+    var err error
+
+    //
+    // Instantiate the structure.
+    //
     o = &Service{
-      mu:                              &sync.Mutex{},
-      state:                           disconnected,
+      mu: &sync.Mutex{},
+
+      backtest: *cfgBacktest,
+
+      state: disconnected,
+
       onOneMinCandleCloseHandlers:     make([]func(*candle.Candle), 0),
       onFiveMinCandleCloseHandlers:    make([]func(*candle.Candle), 0),
       onFifteenMinCandleCloseHandlers: make([]func(*candle.Candle), 0),
       onCandleCloseHandlers:           make([]func(), 0),
+    }
+
+    //
+    // Parse the backtest start and end timestamps if backtesting has been enabled.
+    //
+    if o.backtest {
+      o.backtestStart, err = time.Parse("", *cfgBacktestStart)
+      if err != nil {
+        log.Fatalf("Failed to instantiate. Backtest start timestamp could not be parsed. (Error: %s)", err)
+      }
+
+      o.backtestEnd, err = time.Parse("", *cfgBacktestEnd)
+      if err != nil {
+        log.Fatalf("Failed to instantiate. Backtest end timestamp could not be parsed. (Error: %s)", err)
+      }
+
+      log.Printf("Enabled backtesting. (Start: %s, End: %s)", o.backtestStart, o.backtestEnd)
     }
   })
 
@@ -137,7 +198,7 @@ func (o *Service) Start() (<-chan bool, error) {
   //
   // Fire off a goroutine as the executor for the service.
   //
-  go o.monitor()
+  go o.service()
 
   //
   // Return our "started" channel in case the caller wants to block on it and log some debug info.
@@ -175,10 +236,10 @@ func (o *Service) Stop() (<-chan bool, error) {
 }
 
 //
-// Monitor connects to the Coinbase Pro websocket feed and monitors it for trade events so that it
+// service connects to the Coinbase Pro websocket feed and monitors it for trade events so that it
 // can determine when to buy or sell currency.
 //
-func (o *Service) monitor() {
+func (o *Service) service() {
   var err error
 
   //

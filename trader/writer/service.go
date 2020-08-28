@@ -60,6 +60,7 @@ type Service struct {
   mu         *sync.Mutex
   chKill     chan bool
   chStopped  chan bool
+
   outputDir  string
   outputFile *os.File
   writer     *csv.Writer
