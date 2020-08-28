@@ -6,6 +6,7 @@ import (
   "github.com/lukehollenback/goose/constants"
   "github.com/lukehollenback/goose/exchange"
   "github.com/lukehollenback/goose/trader/candle"
+  "github.com/lukehollenback/goose/trader/writer"
   "github.com/shopspring/decimal"
   "log"
   "sync"
@@ -311,9 +312,18 @@ func (o *Service) backtestTrades() {
     // Process and produce historical candles.
     //
     for _, v := range oneMinResp.Candles() {
+      //
+      // Write the one minute candle's close price.
+      //
+      _ = writer.Instance().Write(*(v.EndTime()), writer.ClosingPrice, *(v.Close()))
+
+      //
+      // Create all of the necessary candles and then "produce" them to any handlers that are
+      // registered and waiting for them.
+      //
       // NOTE ~> We will always have a one minute candle. Occasionally we'll have a five minute
       //  candle or a fifteen minute candle.
-
+      //
       candles := &candle.Candles{
         OneMin: candle.CreateFullCandle(*(v.StartTime()), candle.OneMin, *(v.Open()), *(v.Close()), *(v.High()), *(v.Low()), *(v.Volume()), decimal.NewFromInt(int64(*(v.Count())))),
       }

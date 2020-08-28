@@ -15,11 +15,12 @@ import (
 const (
   Name         = "≪writer-service≫"
   TimestampKey = "Timestamp"
+  MaxFill      = 1000
 )
 
 var (
-  o    *Service
-  once sync.Once
+  o      *Service
+  once   sync.Once
   logger *log.Logger
 
   cfgOutputDir *string
@@ -29,7 +30,7 @@ func init() {
   //
   // Initialize the logger.
   //
-  logger = log.New(log.Writer(), fmt.Sprintf(constants.LogPrefixFmt, Name), log.Ldate | log.Ltime | log.Lmsgprefix)
+  logger = log.New(log.Writer(), fmt.Sprintf(constants.LogPrefixFmt, Name), log.Ldate|log.Ltime|log.Lmsgprefix)
 
   //
   // Determine the current working directory. If that cannot be done for some reason, we are in a
@@ -57,13 +58,14 @@ func init() {
 // Service represents a service instance.
 //
 type Service struct {
-  mu         *sync.Mutex
-  chKill     chan bool
-  chStopped  chan bool
+  mu        *sync.Mutex
+  chKill    chan bool
+  chStopped chan bool
 
   outputDir  string
   outputFile *os.File
   writer     *csv.Writer
+  fill       int
 }
 
 //
@@ -180,8 +182,14 @@ func (o *Service) Stop() (<-chan bool, error) {
 //  pivot on them as well.
 //
 func (o *Service) Write(timestamp time.Time, category Type, value decimal.Decimal) error {
+  o.mu.Lock()
+  defer o.mu.Unlock()
+
   var err error
 
+  //
+  // Write out the line to the CSV file.
+  //
   if category == ClosingPrice {
     err = o.writer.Write([]string{timestamp.String(), value.String(), ""})
   } else if category == GrossMockEarnings {
@@ -193,6 +201,13 @@ func (o *Service) Write(timestamp time.Time, category Type, value decimal.Decima
       "Failed to write out data point. (Timestamp: %s, Category: %s, Value: %s) (Error: %s)",
       timestamp, category, value, err,
     )
+  }
+
+  //
+  // If we have reached our max fill, force a flush.
+  //
+  if o.fill++; o.fill >= MaxFill {
+    o.writer.Flush()
   }
 
   return err
