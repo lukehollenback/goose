@@ -71,8 +71,11 @@ func (o *Service) EnableMockTrading(initUSDHolding decimal.Decimal, tradeFee dec
 
   o.mockUSD = initUSDHolding
   o.mockUSDInit = initUSDHolding
+  o.mockTradeFee = tradeFee
   o.mockUSDGain = decimal.Zero
   o.isMockTrading = true
+
+  logger.Printf("Enabled mock trading. (Initial USD: %s, Trade Fee: %s)", initUSDHolding, tradeFee)
 }
 
 //
@@ -188,7 +191,7 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal, timestamp time.Ti
     //
     // Execute the mock transaction and enter the new position.
     //
-    o.mockBTC = o.mockUSD.Div(price).Sub(fee)
+    o.mockBTC = o.mockUSD.Sub(fee).Div(price)
     o.mockUSD = decimal.Zero
     o.position = holding
 
@@ -239,7 +242,8 @@ func (o *Service) Signal(signal Signal, price decimal.Decimal, timestamp time.Ti
   // Log details about the current position now that the mock trade has been executed.
   //
   logger.Printf(
-    "Mock trade executed! Current holdings are %s and %s. %s %s",
+    "Mock trade executed (at %s)! Current holdings are %s and %s. %s %s",
+    price,
     aurora.Bold(aurora.Yellow(fmt.Sprintf("%s %s", o.mockBTC, o.asset))),
     aurora.Bold(aurora.Green(fmt.Sprintf("%s USD", o.mockUSD))),
     feeMsg,

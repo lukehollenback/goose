@@ -43,8 +43,8 @@ func init() {
     "ma-precision",
     8,
     fmt.Sprintf(
-      "The number of decimals to which moving averages of asset values should be rounded to. Common values " +
-        "include 8 (1 Satoshi) for BTC and 7 (1 Stroop) for XLM.",
+      "The number of decimals to which moving averages of asset values should be rounded to. Common values "+
+          "include 8 (1 Satoshi) for BTC and 7 (1 Stroop) for XLM.",
     ),
   )
 
@@ -108,6 +108,9 @@ type Algo struct {
   emaShortPrev decimal.Decimal // Previously-calculated short-duration exponential moving average.
   emaLong      decimal.Decimal // Most-recently-calculated long-duration exponential moving average.
   emaLongPrev  decimal.Decimal // Previously-calculated long-duration exponential moving average.
+
+  uptrendConfs       int // Number of uptrend confirmations that have occurred.
+  uptrendConfsNeeded int // Number of uptrend confirmations that are needed to emit an uptrend signal.
 }
 
 //
@@ -143,6 +146,9 @@ func InitWithFlags(period int, longLen int, shortLen int, exp bool) *Algo {
       emaShortPrev: constants.NegOne(),
       emaLong:      constants.NegOne(),
       emaLongPrev:  constants.NegOne(),
+
+      uptrendConfs: 0,
+      uptrendConfsNeeded: 0,
     }
 
     //
@@ -293,22 +299,23 @@ func (o *Algo) candleCloseHandler(newCandle *candle.Candle) {
     // the current position should be "held".
     //
     shortAboveLong := o.maShort.GreaterThan(o.maLong)
-    shortAboveLongPrev := o.maShortPrev.GreaterThan(o.maLongPrev)
-
     shortBelowLong := o.maShort.LessThan(o.maLong)
-    shortBelowLongPrev := o.maShortPrev.LessThan(o.maLongPrev)
 
-    if shortAboveLong == shortAboveLongPrev && shortBelowLong == shortBelowLongPrev {
-      // TODO ~> Signal that current position should be held.
-    } else {
-      if shortAboveLong {
+    if shortAboveLong {
+      o.uptrendConfs++
+
+      if o.uptrendConfs >= o.uptrendConfsNeeded && o.lastSignal != broker.UptrendDetected {
         logger.Printf(
-          "Short MA (%s) has crossed ABOVE long MA (%s). This is a %s signal (at %s)!",
-          o.maShort, o.maLong, aurora.Bold(aurora.Green("BUY")), newCandle.CloseAmt(),
+          "Short MA (%s) has crossed ABOVE long MA (%s) w/%d confirmations. This is a %s signal (at %s)!",
+          o.maShort, o.maLong, o.uptrendConfs, aurora.Bold(aurora.Green("BUY")), newCandle.CloseAmt(),
         )
 
         o.emitSignal(broker.UptrendDetected, newCandle)
-      } else if shortBelowLong {
+      }
+    } else if shortBelowLong {
+      o.uptrendConfs = 0
+
+      if o.lastSignal != broker.DowntrendDetected {
         logger.Printf(
           "Short MA (%s) has crossed BELOW long MA (%s). This is a %s signal (at %s)!",
           o.maShort, o.maLong, aurora.Bold(aurora.Red("SELL")), newCandle.CloseAmt(),

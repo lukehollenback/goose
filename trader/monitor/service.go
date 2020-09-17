@@ -311,6 +311,9 @@ func (o *Service) backtestTrades() {
     //
     // Process and produce historical candles.
     //
+    fiveMinIndex := 0
+    fifteenMinIndex := 0
+
     for _, v := range oneMinResp.Candles() {
       //
       // Write the one minute candle's close price.
@@ -328,14 +331,18 @@ func (o *Service) backtestTrades() {
         OneMin: candle.CreateFullCandle(*(v.StartTime()), candle.OneMin, *(v.Open()), *(v.Close()), *(v.High()), *(v.Low()), *(v.Volume()), decimal.NewFromInt(int64(*(v.Count())))),
       }
 
-      if fiveMinResp.Candles()[0].EndTime().Equal(*v.EndTime()) {
-        v := fiveMinResp.Candles()[0]
+      if fiveMinResp.Candles()[fiveMinIndex].EndTime().Equal(*v.EndTime()) {
+        v := fiveMinResp.Candles()[fiveMinIndex]
         candles.FiveMin = candle.CreateFullCandle(*(v.StartTime()), candle.OneMin, *(v.Open()), *(v.Close()), *(v.High()), *(v.Low()), *(v.Volume()), decimal.NewFromInt(int64(*(v.Count()))))
+
+        fiveMinIndex++
       }
 
-      if fifteenMinResp.Candles()[0].EndTime().Equal(*v.EndTime()) {
-        v := fifteenMinResp.Candles()[0]
-        candles.FiveMin = candle.CreateFullCandle(*(v.StartTime()), candle.OneMin, *(v.Open()), *(v.Close()), *(v.High()), *(v.Low()), *(v.Volume()), decimal.NewFromInt(int64(*(v.Count()))))
+      if fifteenMinResp.Candles()[fifteenMinIndex].EndTime().Equal(*v.EndTime()) {
+        v := fifteenMinResp.Candles()[fifteenMinIndex]
+        candles.FifteenMin = candle.CreateFullCandle(*(v.StartTime()), candle.OneMin, *(v.Open()), *(v.Close()), *(v.High()), *(v.Low()), *(v.Volume()), decimal.NewFromInt(int64(*(v.Count()))))
+
+        fifteenMinIndex++
       }
 
       o.processClosedCandles(candles)
@@ -572,23 +579,23 @@ func (o *Service) processClosedCandles(candles *candle.Candles) {
   //
   if candles.OneMin != nil {
     for _, handler := range o.onOneMinCandleCloseHandlers {
-      go handler(candles.OneMin)
+      /*go */handler(candles.OneMin)
     }
   }
 
   if candles.FiveMin != nil {
     for _, handler := range o.onFiveMinCandleCloseHandlers {
-      go handler(candles.FiveMin)
+      /*go */handler(candles.FiveMin)
     }
   }
 
   if candles.FifteenMin != nil {
     for _, handler := range o.onFifteenMinCandleCloseHandlers {
-      go handler(candles.FifteenMin)
+      /*go */handler(candles.FifteenMin)
     }
   }
 
   for _, handler := range o.onCandleCloseHandlers {
-    go handler()
+    /*go */handler()
   }
 }
