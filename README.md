@@ -1,6 +1,6 @@
 <div align="center">
   <div>
-    <img src="./logo.png" alt="Goose" style="display: block;"/>
+    <h1>Goose</h1>
   </div>
 
   <div>
