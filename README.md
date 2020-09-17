@@ -1,16 +1,7 @@
-<div align="center">
-  <div>
-    <h1>Goose</h1>
-  </div>
+# Goose
 
-  <div>
-    <img src="https://img.shields.io/badge/status-Work in Progress-blue.svg" alt="Status: Work in Progress"/>
-    <a href="./COPYRIGHT"><img src="https://img.shields.io/badge/license-Copyright © 2020 Luke Hollenback-black.svg" alt="Status: Work in Progress"/></a>
-  </div>
-  
-</div>
-
-<hr>
+![Status: Work in Progress](https://img.shields.io/badge/status-Work in Progress-blue.svg)
+![License: Copyright © 2020 Luke Hollenback](https://img.shields.io/badge/license-Copyright © 2020 Luke Hollenback-black.svg)
 
 Goose is a *quantitative finance cryptocurrency trader* written primarily in *Go*. It has market
 watch and information services, trading services, a pluggable system for implementing scalable
